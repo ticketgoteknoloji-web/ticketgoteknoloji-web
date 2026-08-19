@@ -1,0 +1,940 @@
+{
+  "currency": "TRY",
+  "billingPeriods": ["monthly", "annual"],
+  "annualDiscount": 0.2,
+  "annualDiscountByCategory": {
+    "ticketgo": 0.2,
+    "support": 0.2,
+    "ai": 0.15,
+    "dedicatedTeam": 0.15
+  },
+  "taxNotice": "Prices exclude VAT. 20% VAT is added at checkout.",
+  "taxNoticeTr": "Fiyatlar KDV hariçtir. Ödeme aşamasında %20 KDV eklenir.",
+  "lastReviewedAt": "2026-08-18",
+  "plans": [
+    {
+      "id": "ticketgo-starter",
+      "name": "Starter",
+      "category": "ticketgo",
+      "model": "hybrid-saas-starting-at",
+      "headline": "Tek kanal, net operasyon",
+      "description": "Tek satış kanalı ve sınırlı operatör ekibi için Ticket-Go benzeri rezervasyon altyapısının başlangıç kurulumudur. Kapsam, keşif sonrası netleşir.",
+      "monthlyPrice": 249,
+      "startingAt": true,
+      "customQuote": false,
+      "popular": false,
+      "recommended": 249,
+      "minimum": 199,
+      "premium": 349,
+      "ctaLabel": "Starter'ı Seçin",
+      "contactType": "Ticket-Go Starter",
+      "ctaMessage": "Ticket-Go Starter paketi hakkında teklif almak istiyorum.",
+      "features": [
+        "En fazla 3 operatör kullanıcısı",
+        "Ayda 2.000 biletleme kaydı",
+        "Online rezervasyon ve e-bilet",
+        "Temel sefer / kapasite yönetimi",
+        "E-posta bildirimleri",
+        "Standart ödeme entegrasyonu",
+        "İş günü e-posta desteği",
+        "Tek üretim ortamı"
+      ],
+      "unit": "TL / ay, ortam başına",
+      "setupFee": 2900,
+      "delivery": "Kurulum 3–5 hafta (kapsam onayından sonra)",
+      "includes": [
+        "Tek marka / tek operasyon ortamı",
+        "Standart rezervasyon ve e-bilet akışı",
+        "Temel yönetim paneli",
+        "Başlangıç veri modeli ve rol seti"
+      ],
+      "excludes": [
+        "B2B acente ağı",
+        "Özel API ürünleştirme",
+        "Çok markalı operasyon",
+        "Yeni mobil uygulama geliştirmesi",
+        "Ödeme kuruluşu komisyonları"
+      ],
+      "customerResponsibilities": [
+        "Marka varlıkları ve yasal metinler",
+        "Ödeme hesabı ve sözleşmeleri",
+        "Sefer / ürün verisinin doğruluğu",
+        "Kullanıcı kabul testine katılım"
+      ],
+      "revisionLimits": "Kurulum kapsamında 2 tur içerik ve ayar revizyonu",
+      "cancellation": "Aylık dönemde dönemin sonuna kadar hizmet devam eder. Yıllık peşin ödemede ilk 14 gün içinde cayma hakkı; sonrasında kullanılmayan aylar iade edilmez.",
+      "comparison": {
+        "users": "3",
+        "tickets": "2.000 / ay",
+        "eticket": true,
+        "b2b": false,
+        "operations": "Temel",
+        "api": false,
+        "sla": "İş günü e-posta",
+        "environments": "1"
+      }
+    },
+    {
+      "id": "ticketgo-growth",
+      "name": "Growth",
+      "category": "ticketgo",
+      "model": "hybrid-saas-starting-at",
+      "headline": "B2B ve operasyonu birlikte yönetin",
+      "description": "Acente satışı, operasyon paneli ve daha yüksek bilet hacmi gereken işletmeler için hedef pakettir. Çoğu ulaşım ve rezervasyon senaryosu bu seviyede karşılanır.",
+      "monthlyPrice": 790,
+      "startingAt": true,
+      "customQuote": false,
+      "popular": true,
+      "recommended": 790,
+      "minimum": 690,
+      "premium": 990,
+      "ctaLabel": "Growth'u Seçin",
+      "contactType": "Ticket-Go Growth",
+      "ctaMessage": "Ticket-Go Growth paketi hakkında teklif almak istiyorum.",
+      "features": [
+        "En fazla 10 operatör kullanıcısı",
+        "Ayda 10.000 biletleme kaydı",
+        "B2B acente / bayi paneli",
+        "Operasyon ve check-in akışı",
+        "SMS ve e-posta bildirimleri",
+        "Dashboard ve satış raporları",
+        "Öncelikli e-posta + mesai içi destek",
+        "Staging ve üretim ortamı"
+      ],
+      "unit": "TL / ay, ortam başına",
+      "setupFee": 6500,
+      "delivery": "Kurulum 5–8 hafta (kapsam onayından sonra)",
+      "includes": [
+        "Acente fiyat ve kontenjan görünümü",
+        "Operasyon ekranları",
+        "Standart rapor seti",
+        "İki ortam (staging + production)"
+      ],
+      "excludes": [
+        "Çok şirketli holding mimarisi",
+        "Özel SLA sözleşmesi",
+        "Yeni native mobil uygulama",
+        "Ödeme kuruluşu komisyonları"
+      ],
+      "customerResponsibilities": [
+        "Acente sözleşmeleri ve komisyon kuralları",
+        "Operasyon prosedürlerinin netleştirilmesi",
+        "UAT ve eğitim katılımı"
+      ],
+      "revisionLimits": "Kurulum kapsamında 3 tur süreç ve ekran revizyonu",
+      "cancellation": "Aylık dönemde dönemin sonuna kadar hizmet devam eder. Yıllık peşin ödemede ilk 14 gün içinde cayma hakkı; sonrasında kullanılmayan aylar iade edilmez.",
+      "comparison": {
+        "users": "10",
+        "tickets": "10.000 / ay",
+        "eticket": true,
+        "b2b": true,
+        "operations": "Tam operasyon paneli",
+        "api": "Salt okunur rapor API",
+        "sla": "İş günü, 8 saat ilk yanıt",
+        "environments": "2"
+      }
+    },
+    {
+      "id": "ticketgo-scale",
+      "name": "Scale",
+      "category": "ticketgo",
+      "model": "hybrid-saas-starting-at",
+      "headline": "API, hacim ve yönetişim",
+      "description": "Yüksek hacim, entegrasyon ve daha sıkı operasyon kontrolü gereken ekipler içindir. Limitler ve SLA teklifte netleştirilir.",
+      "monthlyPrice": 1690,
+      "startingAt": true,
+      "customQuote": false,
+      "popular": false,
+      "recommended": 1690,
+      "minimum": 1490,
+      "premium": 2190,
+      "ctaLabel": "Scale'i Seçin",
+      "contactType": "Ticket-Go Scale",
+      "ctaMessage": "Ticket-Go Scale paketi hakkında teklif almak istiyorum.",
+      "features": [
+        "Anlaşmalı kullanıcı limiti (başlangıç 25)",
+        "Ayda 50.000 biletleme kaydı",
+        "Yazma destekli API ve webhook",
+        "Gelişmiş yetki ve işlem logları",
+        "Öncelikli destek kuyruğu",
+        "Kapasite ve fiyat kuralları",
+        "Çeyreklik sağlık incelemesi",
+        "Staging + production + yedek ortam"
+      ],
+      "unit": "TL / ay, ortam başına",
+      "setupFee": 12000,
+      "delivery": "Kurulum 8–12 hafta (kapsam onayından sonra)",
+      "includes": [
+        "API erişimi ve temel webhook seti",
+        "Rol bazlı yetkilendirme genişletmesi",
+        "Performans izleme düzeni",
+        "Öncelikli olay kuyruğu"
+      ],
+      "excludes": [
+        "7/24 yerinde nöbetçi ekip",
+        "Özel veri merkezi kurulumu",
+        "Sertifika veya denetim belgesi iddiası"
+      ],
+      "customerResponsibilities": [
+        "Entegrasyon karşı taraf erişimleri",
+        "Güvenlik inceleme takvimi",
+        "Üretim yayın onayı"
+      ],
+      "revisionLimits": "Kurulum kapsamında 4 tur mimari ve süreç revizyonu",
+      "cancellation": "Aylık dönemde dönemin sonuna kadar hizmet devam eder. Yıllık peşin ödemede ilk 14 gün içinde cayma hakkı; sonrasında kullanılmayan aylar iade edilmez.",
+      "comparison": {
+        "users": "25 (arttırılabilir)",
+        "tickets": "50.000 / ay",
+        "eticket": true,
+        "b2b": true,
+        "operations": "Gelişmiş + log",
+        "api": "Okuma / yazma + webhook",
+        "sla": "İş günü, 4 saat P1",
+        "environments": "3"
+      }
+    },
+    {
+      "id": "ticketgo-enterprise",
+      "name": "Enterprise",
+      "category": "ticketgo",
+      "model": "custom-quote",
+      "headline": "Özel SLA ve kurumsal yönetişim",
+      "description": "Çok şirketli yapı, özel güvenlik gereksinimleri veya yüksek hacimli B2B ağları için kapsam incelemesinden sonra teklif hazırlanır.",
+      "monthlyPrice": null,
+      "startingAt": false,
+      "customQuote": true,
+      "popular": false,
+      "recommended": null,
+      "minimum": 2500,
+      "premium": null,
+      "ctaLabel": "Satış ile Görüşün",
+      "contactType": "Ticket-Go Enterprise",
+      "ctaMessage": "Ticket-Go Enterprise / özel SLA hakkında görüşmek istiyorum.",
+      "features": [
+        "Özel kullanıcı ve hacim limiti",
+        "Kurumsal SSO / yetki modeli",
+        "Özel SLA ve öncelikli destek",
+        "Güvenlik ve yayın süreçleri",
+        "Özel entegrasyon iş paketi",
+        "Onboarding ve eğitim planı",
+        "İsteğe bağlı ayrı ortam topolojisi",
+        "Sözleşmeli kapasite rezervi"
+      ],
+      "unit": "Özel teklif",
+      "setupFee": null,
+      "delivery": "Kapsam incelemesinden sonra planlanır",
+      "includes": [
+        "Keşif ve mimari değerlendirme",
+        "Yazılı teklif ve iş kırılımı"
+      ],
+      "excludes": [
+        "Keşif tamamlanmadan sabit fiyat taahhüdü"
+      ],
+      "customerResponsibilities": [
+        "Güvenlik ve yasal gereksinimlerin yazılı iletilmesi"
+      ],
+      "revisionLimits": "Teklif turları kapsam belgesine bağlıdır",
+      "cancellation": "Sözleşme maddelerine göre belirlenir.",
+      "comparison": {
+        "users": "Özel",
+        "tickets": "Özel",
+        "eticket": true,
+        "b2b": true,
+        "operations": "Kurumsal",
+        "api": "Özel entegrasyon",
+        "sla": "Sözleşmeli",
+        "environments": "Özel"
+      }
+    }
+  ],
+  "services": [
+    {
+      "id": "discovery",
+      "name": "Discovery",
+      "category": "services",
+      "model": "project-fixed",
+      "headline": "Kapsamı netleştirin, riski düşürün",
+      "description": "İhtiyaç, süreç, entegrasyon ve mimari varsayımlarını 2–3 haftada belgelendiren sabit ücretli keşif çalışmasıdır.",
+      "monthlyPrice": null,
+      "startingAt": false,
+      "customQuote": false,
+      "popular": false,
+      "recommended": 5800,
+      "minimum": 4900,
+      "premium": 7800,
+      "ctaLabel": "Keşfi Başlatın",
+      "contactType": "Discovery",
+      "ctaMessage": "Discovery (keşif) çalışması için teklif almak istiyorum.",
+      "features": [
+        "Süreç ve paydaş görüşmeleri",
+        "Mevcut sistem envanteri",
+        "Hedef mimari taslağı",
+        "Öncelikli backlog",
+        "Risk ve varsayım listesi",
+        "Fazlı iş kırılımı",
+        "Bütçe aralığı önerisi",
+        "Yazılı keşif raporu"
+      ],
+      "unit": "TL, tek seferlik",
+      "setupFee": 5800,
+      "delivery": "2–3 hafta",
+      "includes": [
+        "En fazla 4 keşif oturumu",
+        "Tek keşif raporu ve mimari notu",
+        "MVP için tahmini iş paketi"
+      ],
+      "excludes": [
+        "Yazılım geliştirme",
+        "Üretim kurulumu",
+        "Veri migrasyonu uygulaması"
+      ],
+      "customerResponsibilities": [
+        "Karar vericilerin oturumlara katılması",
+        "Mevcut belge ve erişimlerin paylaşılması"
+      ],
+      "revisionLimits": "Raporda 1 tur düzeltme",
+      "cancellation": "Başlamamış iş iade edilir. Tamamlanan oturumlar oransal faturalanır."
+    },
+    {
+      "id": "mvp",
+      "name": "MVP",
+      "category": "services",
+      "model": "project-starting-at",
+      "headline": "Üretime gidebilecek ilk sürüm",
+      "description": "Tek ana iş akışı, kimlik, yönetim paneli ve temel rapor ile sınırlı ilk ürün sürümüdür. Kapsam dışı işler ayrı tekliflenir.",
+      "monthlyPrice": null,
+      "startingAt": true,
+      "customQuote": false,
+      "popular": false,
+      "recommended": 48000,
+      "minimum": 36000,
+      "premium": 72000,
+      "ctaLabel": "MVP Teklifi Alın",
+      "contactType": "MVP Geliştirme",
+      "ctaMessage": "MVP geliştirme paketi için teklif almak istiyorum.",
+      "features": [
+        "Tek öncelikli iş akışı",
+        "Kimlik ve rol yönetimi",
+        "Web arayüz ve yönetim paneli",
+        "Temel bildirimler",
+        "Tek kritik entegrasyon",
+        "UAT ve yayın desteği",
+        "Kaynak kod teslimi (sözleşmeye göre)",
+        "30 gün hata düzeltme penceresi"
+      ],
+      "unit": "TL, proje başlangıç",
+      "setupFee": 48000,
+      "delivery": "8–12 hafta (keşif sonrası)",
+      "includes": [
+        "Keşif çıktısına bağlı sabit iş kırılımı",
+        "Tasarım sistemi ile uyumlu arayüz",
+        "Staging ortamı",
+        "Yayın kontrol listesi"
+      ],
+      "excludes": [
+        "İkinci platform (native mobil) varsayılan değildir",
+        "Sınırsız entegrasyon",
+        "AI kotası ve model faturaları",
+        "Süresiz yeni özellik geliştirmesi"
+      ],
+      "customerResponsibilities": [
+        "İçerik, kural ve test verisi",
+        "Haftalık karar turlarına katılım",
+        "UAT’nin zamanında tamamlanması"
+      ],
+      "revisionLimits": "Kapsamdaki ekranlar için 2 tur UI revizyonu",
+      "cancellation": "Tamamlanan kilometre taşları iade edilmez. Başlamamış fazlar iptal edilebilir."
+    },
+    {
+      "id": "growth-product",
+      "name": "Growth",
+      "category": "services",
+      "model": "project-starting-at",
+      "headline": "Çok akışlı ürün ve operasyon",
+      "description": "CRM, rezervasyon, operasyon veya B2B katmanlarını bir araya getiren olgun ürün fazıdır. Çoğu kurumsal ilk üretim bu seviyeden başlar.",
+      "monthlyPrice": null,
+      "startingAt": true,
+      "customQuote": false,
+      "popular": true,
+      "recommended": 96000,
+      "minimum": 78000,
+      "premium": 145000,
+      "ctaLabel": "Growth Teklifi Alın",
+      "contactType": "Growth Ürün Geliştirme",
+      "ctaMessage": "Growth ürün geliştirme paketi için teklif almak istiyorum.",
+      "features": [
+        "Birden fazla iş akışı",
+        "Rol ve onay mekanizmaları",
+        "Dashboard ve raporlama",
+        "2–4 sistem entegrasyonu",
+        "Otomasyon kuralları",
+        "QA ve yayın süreci",
+        "Operasyon eğitimi",
+        "60 gün hata düzeltme penceresi"
+      ],
+      "unit": "TL, proje başlangıç",
+      "setupFee": 96000,
+      "delivery": "4–7 ay (keşif sonrası)",
+      "includes": [
+        "Ürün omurgası ve yönetim katmanı",
+        "Anlaşılmış entegrasyon seti",
+        "Test ve yayın planı",
+        "Kısa operasyon kılavuzu"
+      ],
+      "excludes": [
+        "Sınırsız kapsam genişlemesi",
+        "Üçüncü taraf lisans bedelleri",
+        "7/24 destek (ayrı paket)"
+      ],
+      "customerResponsibilities": [
+        "İş kurallarının yazılı netleştirilmesi",
+        "Karşı sistemlerde teknik muhatap",
+        "Üretim verisi ve yasal metinler"
+      ],
+      "revisionLimits": "Her ana modül için 2 tur kapsam içi revizyon",
+      "cancellation": "Tamamlanan kilometre taşları iade edilmez."
+    },
+    {
+      "id": "dedicated-team",
+      "name": "Dedicated Team",
+      "category": "dedicatedTeam",
+      "model": "monthly-team",
+      "headline": "Sürekli ürün kapasitesi",
+      "description": "Aylık rezerve edilmiş kıdemli geliştirme kapasitesidir. Yol haritası sizin önceliklerinize göre işlenir; kapsam her sprintte netleştirilir.",
+      "monthlyPrice": 14500,
+      "startingAt": true,
+      "customQuote": false,
+      "popular": false,
+      "recommended": 14500,
+      "minimum": 12500,
+      "premium": 22000,
+      "ctaLabel": "Ekip Teklifi Alın",
+      "contactType": "Dedicated Team",
+      "ctaMessage": "Dedicated Team kapasitesi için teklif almak istiyorum.",
+      "features": [
+        "Başlangıç: 2 kişilik çekirdek ekip",
+        "Aylık ~160 mühendis-saat",
+        "Ürün / teknik koordinasyon",
+        "Sprint planı ve demo",
+        "Kod sahipliği sözleşmeye göre",
+        "Öncelik kuyruğu sizin yönetiminizde",
+        "Aylık ilerleme özeti",
+        "Minimum 3 ay taahhüt"
+      ],
+      "unit": "TL / ay, ekip kapasitesi",
+      "setupFee": 2500,
+      "delivery": "İlk sprint 2 hafta içinde başlar",
+      "includes": [
+        "Rezerve kapasite",
+        "Haftalık senkron",
+        "Standart kalite kontrolü"
+      ],
+      "excludes": [
+        "7/24 nöbet",
+        "Üçüncü taraf lisans ve model faturaları",
+        "Kapsamı belirsiz sabit teslim garantisi"
+      ],
+      "customerResponsibilities": [
+        "Önceliklendirme ve kabul",
+        "Ortam ve erişimlerin açık tutulması"
+      ],
+      "revisionLimits": "Sprint içi kapsam, kapasiteyle sınırlıdır",
+      "cancellation": "3 aydan sonra 30 gün önceden bildirimle durdurulabilir. Peşin yıllık dönemde ilk 14 gün cayma hakkı geçerlidir."
+    }
+  ],
+  "addOns": [
+    {
+      "id": "extra-operator-seat",
+      "name": "Ek operatör kullanıcısı",
+      "description": "Ticket-Go paket kullanıcı limitinin üzerindeki her ek operatör koltuğu.",
+      "price": 29,
+      "unit": "TL / kullanıcı / ay",
+      "startingAt": false,
+      "contactType": "Ek Kullanıcı",
+      "ctaMessage": "Ticket-Go için ek operatör kullanıcısı eklemek istiyorum."
+    },
+    {
+      "id": "extra-support-hour",
+      "name": "Ek destek / geliştirme saati",
+      "description": "Paket dışı analiz, hata dışı değişiklik veya danışmanlık saati.",
+      "price": 145,
+      "unit": "TL / saat",
+      "startingAt": false,
+      "contactType": "Saatlik Uzmanlık",
+      "ctaMessage": "Saatlik uzmanlık desteği hakkında bilgi almak istiyorum."
+    },
+    {
+      "id": "custom-integration",
+      "name": "Özel entegrasyon",
+      "description": "ERP, ödeme, SMS, kargo veya üçüncü taraf API bağlantısı. Kapsam netleşmeden sabitlenmez.",
+      "price": 4900,
+      "unit": "TL, iş paketi başlangıç",
+      "startingAt": true,
+      "contactType": "API & Entegrasyon",
+      "ctaMessage": "Özel entegrasyon iş paketi için teklif almak istiyorum."
+    },
+    {
+      "id": "mobile-app",
+      "name": "Mobil uygulama",
+      "description": "iOS / Android yaklaşımıyla saha veya müşteri uygulaması. Ayrı ürün iş paketidir.",
+      "price": 24000,
+      "unit": "TL, proje başlangıç",
+      "startingAt": true,
+      "contactType": "Mobil Uygulama",
+      "ctaMessage": "Mobil uygulama iş paketi için teklif almak istiyorum."
+    },
+    {
+      "id": "data-migration",
+      "name": "Veri aktarımı",
+      "description": "Mevcut rezervasyon, müşteri veya ürün verisinin temizlenerek yeni sisteme alınması.",
+      "price": 3500,
+      "unit": "TL, iş paketi başlangıç",
+      "startingAt": true,
+      "contactType": "Veri Aktarımı",
+      "ctaMessage": "Veri aktarımı iş paketi için teklif almak istiyorum."
+    },
+    {
+      "id": "extra-environment",
+      "name": "Ek ortam",
+      "description": "Ek staging, eğitim veya yedek çalışma ortamı.",
+      "price": 190,
+      "unit": "TL / ay",
+      "startingAt": false,
+      "contactType": "Ek Ortam",
+      "ctaMessage": "Ek uygulama ortamı eklemek istiyorum."
+    }
+  ],
+  "usageLimits": [
+    {
+      "id": "tickets",
+      "name": "Biletleme / rezervasyon kaydı",
+      "unit": "kayıt / ay",
+      "includedByPlan": {
+        "ticketgo-starter": 2000,
+        "ticketgo-growth": 10000,
+        "ticketgo-scale": 50000,
+        "ticketgo-enterprise": "Özel"
+      }
+    },
+    {
+      "id": "ai-actions",
+      "name": "AI işlemi",
+      "unit": "işlem / ay",
+      "includedByPlan": {
+        "ai-starter": 3000,
+        "ai-growth": 20000,
+        "ai-scale": 80000
+      }
+    },
+    {
+      "id": "support-hours",
+      "name": "Destek / bakım saati",
+      "unit": "saat / ay",
+      "includedByPlan": {
+        "support-essential": 8,
+        "support-professional": 20,
+        "support-mission": 40
+      }
+    }
+  ],
+  "overageRates": [
+    {
+      "id": "ticket-overage",
+      "name": "Ek biletleme kaydı",
+      "price": 0.12,
+      "unit": "TL / kayıt",
+      "notes": "Starter 0.15, Growth 0.12, Scale 0.08 TL. Tabloda Growth oranı gösterilir. Aşım, ilgili dönemin faturasına yansır."
+    },
+    {
+      "id": "ai-overage",
+      "name": "Ek AI işlemi",
+      "price": 0.045,
+      "unit": "TL / işlem",
+      "notes": "Kota aşıldığında varsayılan olarak durdurma veya aşım faturalama seçilir. Model sağlayıcı fiyatları değişirse kota güncellenebilir."
+    },
+    {
+      "id": "sms-overage",
+      "name": "Ek SMS",
+      "price": 0.08,
+      "unit": "TL / mesaj başlangıç",
+      "notes": "Operatör ve ülke tarifesine göre değişir. Kesin birim, sağlayıcı faturasına bağlıdır."
+    }
+  ],
+  "setupFees": [
+    {
+      "id": "ticketgo-starter-setup",
+      "name": "Ticket-Go Starter kurulum",
+      "price": 2900,
+      "customQuote": false,
+      "notes": "Tek seferlik onboarding, ortam ve standart akış kurulumu."
+    },
+    {
+      "id": "ticketgo-growth-setup",
+      "name": "Ticket-Go Growth kurulum",
+      "price": 6500,
+      "customQuote": false,
+      "notes": "B2B ve operasyon ekranlarını içeren onboarding."
+    },
+    {
+      "id": "ticketgo-scale-setup",
+      "name": "Ticket-Go Scale kurulum",
+      "price": 12000,
+      "customQuote": false,
+      "notes": "API, yetki ve ek ortam topolojisini içeren onboarding."
+    },
+    {
+      "id": "ai-starter-setup",
+      "name": "AI Starter kurulum",
+      "price": 3900,
+      "customQuote": false,
+      "notes": "Tek senaryo, prompt / akış ve güvenlik sınırları."
+    },
+    {
+      "id": "ai-growth-setup",
+      "name": "AI Growth kurulum",
+      "price": 8500,
+      "customQuote": false,
+      "notes": "Birden fazla senaryo ve insan onay kapısı."
+    },
+    {
+      "id": "dedicated-onboarding",
+      "name": "Dedicated Team başlangıç",
+      "price": 2500,
+      "customQuote": false,
+      "notes": "Repo, ortam, çalışma düzeni ve ilk backlog kurulumu."
+    },
+    {
+      "id": "enterprise-setup",
+      "name": "Enterprise kurulum",
+      "price": null,
+      "customQuote": true,
+      "notes": "Kapsam incelemesinden sonra tekliflenir."
+    }
+  ],
+  "aiPlans": [
+    {
+      "id": "ai-starter",
+      "name": "Starter",
+      "category": "ai",
+      "model": "setup-plus-monthly-usage",
+      "headline": "Tek senaryo, kontrollü kota",
+      "description": "Mevcut bir iş sistemine bağlanan tek bir asistan, sınıflandırma veya özetleme senaryosu için başlangıç paketidir.",
+      "monthlyPrice": 590,
+      "startingAt": true,
+      "customQuote": false,
+      "popular": false,
+      "recommended": 590,
+      "minimum": 490,
+      "premium": 790,
+      "ctaLabel": "AI Starter'ı Seçin",
+      "contactType": "AI Starter",
+      "ctaMessage": "AI Starter paketi hakkında teklif almak istiyorum.",
+      "features": [
+        "Tek AI senaryosu",
+        "Ayda 3.000 AI işlemi",
+        "Mevcut sisteme API bağlantısı",
+        "İnsan onay kapısı",
+        "Temel kullanım kaydı",
+        "İş günü e-posta desteği",
+        "Prompt / kural güncellemesi (aylık 2)",
+        "Kota dolunca durdurma seçeneği"
+      ],
+      "unit": "TL / ay + kurulum",
+      "setupFee": 3900,
+      "delivery": "Kurulum 2–4 hafta",
+      "includes": [
+        "Senaryo tasarımı",
+        "Güvenlik ve yetki sınırları",
+        "Aylık kota"
+      ],
+      "excludes": [
+        "Sınırsız model kullanımı",
+        "Eğitim veri seti etiketleme projesi",
+        "Modelin her zaman doğru yanıt vereceği taahhüdü"
+      ],
+      "customerResponsibilities": [
+        "Kaynak verinin yetki sınırlarının tanımlanması",
+        "Yanlış yanıtların geri bildirimi"
+      ],
+      "revisionLimits": "Kurulumda 2 tur senaryo ayarı",
+      "cancellation": "Aylık dönem sonunda durur. Kullanılmayan AI kotası devretmez."
+    },
+    {
+      "id": "ai-growth",
+      "name": "Growth",
+      "category": "ai",
+      "model": "setup-plus-monthly-usage",
+      "headline": "Birden fazla senaryo, üretim kotası",
+      "description": "Destek, doküman veya operasyon kuyruğunda birden fazla AI senaryosunu yönetmek isteyen ekipler için hedef pakettir.",
+      "monthlyPrice": 1490,
+      "startingAt": true,
+      "customQuote": false,
+      "popular": true,
+      "recommended": 1490,
+      "minimum": 1190,
+      "premium": 1890,
+      "ctaLabel": "AI Growth'u Seçin",
+      "contactType": "AI Growth",
+      "ctaMessage": "AI Growth paketi hakkında teklif almak istiyorum.",
+      "features": [
+        "En fazla 4 AI senaryosu",
+        "Ayda 20.000 AI işlemi",
+        "Sınıflandırma + özet + asistan karışımı",
+        "Onay kuyruğu ve log",
+        "Aylık kalite incelemesi",
+        "Öncelikli e-posta desteği",
+        "Kota veya aşım seçeneği",
+        "Rol bazlı erişim"
+      ],
+      "unit": "TL / ay + kurulum",
+      "setupFee": 8500,
+      "delivery": "Kurulum 4–6 hafta",
+      "includes": [
+        "Senaryo seti ve değerlendirme örnekleri",
+        "Aylık 20.000 işlem",
+        "Kullanım panosu"
+      ],
+      "excludes": [
+        "Sınırsız token",
+        "Müşteri verisinin model eğitiminde kullanılacağı iddiası"
+      ],
+      "customerResponsibilities": [
+        "Örnek diyalog / belge seti",
+        "Hassas alanların maskelenmesi"
+      ],
+      "revisionLimits": "Kurulumda 3 tur senaryo ayarı",
+      "cancellation": "Aylık dönem sonunda durur. Kullanılmayan kota devretmez."
+    },
+    {
+      "id": "ai-scale",
+      "name": "Scale",
+      "category": "ai",
+      "model": "setup-plus-monthly-usage",
+      "headline": "Yüksek kota ve yönetişim",
+      "description": "Yüksek hacimli sınıflandırma, arama veya asistan senaryoları için kotası ve yönetişimi geniş pakettir. Model faturası değişirse kota gözden geçirilir.",
+      "monthlyPrice": 3200,
+      "startingAt": true,
+      "customQuote": false,
+      "popular": false,
+      "recommended": 3200,
+      "minimum": 2890,
+      "premium": 4500,
+      "ctaLabel": "AI Scale'i Seçin",
+      "contactType": "AI Scale",
+      "ctaMessage": "AI Scale paketi hakkında teklif almak istiyorum.",
+      "features": [
+        "Senaryo sayısı teklifte netleşir",
+        "Ayda 80.000 AI işlemi",
+        "Öncelikli kapasite",
+        "Değerlendirme seti ve regresyon",
+        "Gelişmiş log ve erişim kaydı",
+        "Aylık mimari gözden geçirme",
+        "Aşım veya burstable kota",
+        "Öncelikli destek"
+      ],
+      "unit": "TL / ay + kurulum",
+      "setupFee": null,
+      "delivery": "Kurulum 6–10 hafta",
+      "includes": [
+        "Yüksek kota",
+        "Yönetişim kontrolleri",
+        "Aylık kalite özeti"
+      ],
+      "excludes": [
+        "Sınırsız kullanım",
+        "Özel temel model eğitimi"
+      ],
+      "customerResponsibilities": [
+        "Veri saklama politikasının yazılı iletilmesi"
+      ],
+      "revisionLimits": "Kurulum teklifine bağlı",
+      "cancellation": "Aylık dönem sonunda durur. Kullanılmayan kota devretmez."
+    }
+  ],
+  "supportPlans": [
+    {
+      "id": "support-essential",
+      "name": "Essential",
+      "category": "support",
+      "model": "monthly-retainer",
+      "headline": "İş saatlerinde temel bakım",
+      "description": "Yayınlanmış bir ürün için güvenlik yamaları, bağımlılık güncellemeleri ve sınırlı hata düzeltmesi.",
+      "monthlyPrice": 890,
+      "startingAt": false,
+      "customQuote": false,
+      "popular": false,
+      "recommended": 890,
+      "minimum": 790,
+      "premium": 1090,
+      "ctaLabel": "Essential'ı Seçin",
+      "contactType": "Bakım Essential",
+      "ctaMessage": "Essential bakım ve destek paketi hakkında teklif almak istiyorum.",
+      "features": [
+        "Ayda 8 saat",
+        "Pazartesi–Cuma, 09:00–18:00 TR",
+        "P1 ilk yanıt: 1 iş günü",
+        "Güvenlik ve bağımlılık yamaları",
+        "Üretim hata düzeltmeleri",
+        "Aylık kısa durum notu",
+        "E-posta kanalı",
+        "Kullanılmayan saat devretmez"
+      ],
+      "unit": "TL / ay",
+      "setupFee": 0,
+      "delivery": "Sözleşme onayından sonraki iş haftası",
+      "includes": [
+        "Düzeltici bakım",
+        "Küçük yapılandırma değişiklikleri"
+      ],
+      "excludes": [
+        "Yeni özellik geliştirmesi",
+        "Kapsam dışı entegrasyon",
+        "7/24 nöbet"
+      ],
+      "customerResponsibilities": [
+        "Ortam erişiminin açık tutulması",
+        "Olayın yeniden üretilebilir tarif edilmesi"
+      ],
+      "revisionLimits": "Saat kotası aşılan iş ayrıca faturalanır",
+      "cancellation": "30 gün önceden bildirim. Cari ay iade edilmez."
+    },
+    {
+      "id": "support-professional",
+      "name": "Professional",
+      "category": "support",
+      "model": "monthly-retainer",
+      "headline": "Aktif ürünler için önerilen bakım",
+      "description": "Canlı operasyonu olan ürünler için daha hızlı yanıt, daha geniş saat havuzu ve sınırlı küçük geliştirmeler.",
+      "monthlyPrice": 1790,
+      "startingAt": false,
+      "customQuote": false,
+      "popular": true,
+      "recommended": 1790,
+      "minimum": 1490,
+      "premium": 2190,
+      "ctaLabel": "Professional'ı Seçin",
+      "contactType": "Bakım Professional",
+      "ctaMessage": "Professional bakım ve destek paketi hakkında teklif almak istiyorum.",
+      "features": [
+        "Ayda 20 saat",
+        "Pazartesi–Cuma, 09:00–18:00 TR",
+        "P1 ilk yanıt: 4 saat",
+        "İzleme uyarılarının incelenmesi",
+        "Küçük geliştirmeler saat kotasından",
+        "Aylık sağlık özeti",
+        "E-posta + paylaşılmış kanal",
+        "Kullanılmayan saat devretmez"
+      ],
+      "unit": "TL / ay",
+      "setupFee": 0,
+      "delivery": "Sözleşme onayından sonraki iş haftası",
+      "includes": [
+        "Düzeltici ve küçük uyarlanabilir işler",
+        "Öncelikli kuyruk"
+      ],
+      "excludes": [
+        "Büyük yeni modüller",
+        "7/24 yerinde ekip"
+      ],
+      "customerResponsibilities": [
+        "Öncelik sırasının net iletilmesi"
+      ],
+      "revisionLimits": "Saat kotası aşılan iş 145 TL/saat",
+      "cancellation": "30 gün önceden bildirim. Cari ay iade edilmez."
+    },
+    {
+      "id": "support-mission",
+      "name": "Mission Critical",
+      "category": "support",
+      "model": "monthly-retainer",
+      "headline": "Gelir etkisi yüksek sistemler",
+      "description": "Kesinti maliyeti yüksek rezervasyon, ödeme veya operasyon sistemleri için genişletilmiş kapsam ve daha sıkı ilk yanıt hedefi.",
+      "monthlyPrice": 3900,
+      "startingAt": false,
+      "customQuote": false,
+      "popular": false,
+      "recommended": 3900,
+      "minimum": 3200,
+      "premium": 5900,
+      "ctaLabel": "Mission Critical'ı Seçin",
+      "contactType": "Bakım Mission Critical",
+      "ctaMessage": "Mission Critical bakım paketi hakkında teklif almak istiyorum.",
+      "features": [
+        "Ayda 40 saat",
+        "Pazartesi–Cuma, 08:00–20:00 TR",
+        "P1 ilk yanıt: 1 saat",
+        "Proaktif izleme düzeni",
+        "Yayın penceresi eşliği",
+        "Aylık kapasite ve risk notu",
+        "Öncelikli iletişim hattı",
+        "Kullanılmayan saat devretmez"
+      ],
+      "unit": "TL / ay",
+      "setupFee": 0,
+      "delivery": "Sözleşme onayından sonraki iş haftası",
+      "includes": [
+        "Genişletilmiş pencere",
+        "Yayın ve olay yönetimi desteği"
+      ],
+      "excludes": [
+        "Yerinde 7/24 vardiya (ayrı teklif)",
+        "Altyapı sağlayıcı kesintilerinin tazmini"
+      ],
+      "customerResponsibilities": [
+        "İzleme ve yayın takviminin paylaşılması"
+      ],
+      "revisionLimits": "Saat kotası aşılan iş 145 TL/saat",
+      "cancellation": "60 gün önceden bildirim. Cari dönem iade edilmez."
+    }
+  ],
+  "assumptions": [
+    "Şirketin iç maliyet muhasebesi, gerçek brüt marjı ve doluluk oranı bu çalışmada mevcut değildir.",
+    "Hedef brüt marj yazılım aboneliklerinde en az %65; keşif/MVP gibi emek yoğun hizmetlerde %55–65 aralığı varsayılmıştır.",
+    "Yüklü iç maliyet varsayımı: 50 TL/saat (kıdemli karma ekip, Türkiye merkezli teslimat, 2026-08-18).",
+    "Ticket-Go genel amaçlı self-servis checkout ile satılmamaktadır; fiyatlar başlangıç teklifidir ve keşif sonrası netleşir.",
+    "Ödeme kuruluşu, SMS operatörü, bulut aşımı ve LLM sağlayıcı faturaları müşteriye yansıtılır veya kotaya gömülür; gömülü kotada model fiyatı artarsa kota düşürülebilir.",
+    "Yıllık indirim ürün ve bakımda %20, AI ve dedicated team için %15 uygulanır.",
+    "KDV (%20) fiyatlara ödeme aşamasında eklenir; katalog fiyatları KDV hariçtir.",
+    "Sahte referans, tasarruf yüzdesi veya sınırlı süre indirimi kullanılmamıştır."
+  ],
+  "faq": [
+    {
+      "question": "Bu fiyatlardan hemen satın alabilir miyim?",
+      "answer": "Hayır. Sitede ödeme altyapısı yoktur. Paket seçimi iletişim formuna gider; kapsam netleştikten sonra yazılı teklif hazırlanır."
+    },
+    {
+      "question": "Fiyatlar kime kesilir ve para birimi nedir?",
+      "answer": "Fiyatlar TL cinsindendir. TicketGo Teknoloji A.Ş. faturalarında vergiler ayrıca uygulanabilir."
+    },
+    {
+      "question": "Yıllık ödeme ne kadar kazandırır?",
+      "answer": "Ürün ve bakım paketlerinde yıllık peşin ödeme, aylık listenin %20 altındadır. AI ve Dedicated Team için indirim %15’tir. Gösterilen tasarruf bu oranlardan hesaplanır."
+    },
+    {
+      "question": "Ticket-Go ücretsiz deneme içeriyor mu?",
+      "answer": "Self-servis ücretsiz plan yoktur. İhtiyaç halinde demo ve keşif görüşmesi planlanır. Discovery paketi, kapsamı ücretli ve sınırlı biçimde netleştirir."
+    },
+    {
+      "question": "AI kotası bitince ne olur?",
+      "answer": "Varsayılan olarak yeni işlemler durur. İsterseniz aşım ücretiyle devam edilebilir. Model sağlayıcı fiyatları değişirse kota veya aşım güncellenebilir."
+    },
+    {
+      "question": "Özel yazılım neden “başlangıç” fiyatıdır?",
+      "answer": "İş akışı, entegrasyon ve veri migrasyonu projeden projeye değişir. Düşük sabit fiyata belirsiz kapsam satılmaz."
+    },
+    {
+      "question": "İptal ve iade nasıl işler?",
+      "answer": "Abonelikler dönem sonuna kadar sürer. Yıllık peşinde ilk 14 gün içinde cayma hakkı vardır; sonrasında kullanılmayan aylar iade edilmez. Proje işlerinde tamamlanan kilometre taşları iade edilmez."
+    }
+  ],
+  "comparisonRows": [
+    { "id": "users", "label": "Operatör kullanıcısı" },
+    { "id": "tickets", "label": "Aylık biletleme kaydı" },
+    { "id": "eticket", "label": "E-bilet / QR" },
+    { "id": "b2b", "label": "B2B acente paneli" },
+    { "id": "operations", "label": "Operasyon katmanı" },
+    { "id": "api", "label": "API" },
+    { "id": "sla", "label": "Destek / ilk yanıt" },
+    { "id": "environments", "label": "Ortam sayısı" }
+  ]
+}
