@@ -220,11 +220,12 @@ export async function grantDownloadEntitlement(input: {
 }): Promise<DownloadEntitlement | null> {
   const pkg = await getStoredPackageByProductId(input.productId);
   if (!pkg) return null;
+  if (pkg.productId !== input.productId) return null;
 
   return enqueue(async () => {
     const db = await readDb();
     const existing = db.entitlements.find(
-      (item) => item.orderId === input.orderId && item.productId === input.productId && item.status !== 'revoked'
+      (item) => item.orderId === input.orderId && item.productId === input.productId && item.status === 'active'
     );
     if (existing) return existing;
     const entitlement: DownloadEntitlement = {
@@ -246,6 +247,32 @@ export async function grantDownloadEntitlement(input: {
   });
 }
 
+/** Revoke all active entitlements for an order (refund / chargeback / cancel-after-pay). */
+export async function revokeDownloadEntitlementsForOrder(orderId: string): Promise<number> {
+  const id = orderId.trim();
+  if (!id) return 0;
+  return enqueue(async () => {
+    const db = await readDb();
+    let count = 0;
+    db.entitlements = db.entitlements.map((item) => {
+      if (item.orderId !== id || item.status === 'revoked') return item;
+      count += 1;
+      return { ...item, status: 'revoked' as const, downloadGranted: true };
+    });
+    if (count > 0) {
+      db.audit.push({
+        id: `AUD-${randomBytes(6).toString('hex')}`,
+        event: 'entitlement_revoked',
+        productId: undefined,
+        createdAt: new Date().toISOString(),
+      });
+      if (db.audit.length > 500) db.audit = db.audit.slice(-500);
+      await writeDb(db);
+    }
+    return count;
+  });
+}
+
 export async function findValidEntitlement(input: {
   productId: string;
   statusTokens: string[];
@@ -255,7 +282,7 @@ export async function findValidEntitlement(input: {
   const now = Date.now();
   const match = db.entitlements.find((item) => {
     if (item.productId !== input.productId) return false;
-    if (item.status === 'revoked') return false;
+    if (item.status !== 'active') return false;
     if (!item.downloadGranted || item.paymentStatus !== 'paid') return false;
     if (!input.statusTokens.includes(item.statusToken)) return false;
     if (item.expiresAt && Date.parse(item.expiresAt) < now) return false;

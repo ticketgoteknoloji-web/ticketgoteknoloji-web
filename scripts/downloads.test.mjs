@@ -11,6 +11,7 @@ const configSrc = readFileSync(join(root, 'src/lib/downloads/config.ts'), 'utf8'
 const storeSrc = readFileSync(join(root, 'src/lib/downloads/store.ts'), 'utf8');
 const storageSrc = readFileSync(join(root, 'src/lib/downloads/storage.ts'), 'utf8');
 const table = readFileSync(join(root, 'src/components/download/DownloadTable.tsx'), 'utf8');
+const uploadModal = readFileSync(join(root, 'src/components/download/AdminUploadModal.tsx'), 'utf8');
 const page = readFileSync(join(root, 'src/app/download/page.tsx'), 'utf8');
 const loginRoute = readFileSync(join(root, 'src/app/api/downloads/admin/login/route.ts'), 'utf8');
 const uploadRoute = readFileSync(join(root, 'src/app/api/downloads/admin/upload/route.ts'), 'utf8');
@@ -54,12 +55,44 @@ test('upload and file routes enforce auth and private storage', () => {
   assert.match(uploadRoute, /status: 401/);
   assert.match(fileRoute, /priceUsd === 0/);
   assert.match(fileRoute, /findValidEntitlement/);
+  assert.match(fileRoute, /order\.status !== 'paid'/);
+  assert.match(fileRoute, /status: 403/);
   assert.match(fileRoute, /Content-Disposition/);
+  assert.match(fileRoute, /X-Content-Type-Options/);
   assert.match(fileRoute, /private, no-store/);
   assert.match(accessRoute, /priceUsd === 0/);
+  assert.match(accessRoute, /canDownload: true/);
+  assert.match(accessRoute, /canDownload: false/);
+  assert.match(accessRoute, /productId/);
   assert.match(storageSrc, /resolveDownloadStorageDir/);
   assert.match(storeSrc, /storedFileExists/);
+  assert.match(storeSrc, /grantDownloadEntitlement/);
+  assert.match(storeSrc, /revokeDownloadEntitlementsForOrder/);
   assert.match(gitignore, /\.storage/);
+});
+
+test('payment claim flow never trusts client paid flags', () => {
+  const claimRoute = readFileSync(join(root, 'src/app/api/downloads/claim/route.ts'), 'utf8');
+  const activator = readFileSync(join(root, 'src/components/download/DownloadAccessActivator.tsx'), 'utf8');
+  const successPage = readFileSync(join(root, 'src/app/payment/success/page.tsx'), 'utf8');
+  const service = readFileSync(join(root, 'src/lib/payments/service.ts'), 'utf8');
+
+  assert.match(claimRoute, /order\.status !== 'paid'/);
+  assert.match(claimRoute, /timingSafeToken/);
+  assert.match(claimRoute, /grantDownloadEntitlement/);
+  assert.match(claimRoute, /void body\.paid|Ignore any client-supplied paid/);
+  assert.doesNotMatch(claimRoute, /if\s*\(\s*body\.paid/);
+  assert.match(activator, /\/api\/downloads\/claim/);
+  assert.match(activator, /İndirme hakkınız aktif/);
+  assert.match(activator, /indirme yetkiniz hazırlanıyor/);
+  assert.match(successPage, /DownloadAccessActivator/);
+  assert.match(successPage, /order\.status !== 'paid'/);
+  assert.match(service, /provider\.verifyPayment/);
+  assert.match(service, /grantDownloadEntitlement/);
+  assert.match(service, /revokeDownloadEntitlementsForOrder/);
+  assert.match(table, /access\?\.canDownload === true/);
+  assert.match(table, /Satın Al/);
+  assert.match(table, /Doğrulanıyor/);
 });
 
 test('commerce resolves download products from real store only', () => {
@@ -121,5 +154,8 @@ test('platform filter helpers support multi-platform packages', () => {
   assert.match(downloadsData, /matchesPlatformFilter/);
   assert.match(table, /PlatformBadges/);
   assert.match(table, /pkg\.platforms/);
-  assert.match(table, /name=\"platforms\"/);
+  assert.match(uploadModal, /name=\"platforms\"/);
+  assert.match(uploadModal, /type=\"file\"/);
+  assert.match(uploadModal, /Dosya Seç/);
+  assert.match(uploadModal, /\/api\/downloads\/admin\/upload/);
 });

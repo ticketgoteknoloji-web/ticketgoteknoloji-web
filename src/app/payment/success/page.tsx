@@ -29,7 +29,6 @@ export default async function PaymentSuccessPage({ searchParams }: { searchParam
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
-      {downloadPkg ? <DownloadAccessActivator orderId={order.id} token={order.statusToken} /> : null}
       <BrandLogo variant="header" />
       <h1 className="mt-8 text-3xl font-semibold tracking-tight text-ink">Ödeme Başarıyla Tamamlandı</h1>
       <dl className="mt-8 space-y-3 rounded-2xl border border-line bg-surface p-6 text-sm">
@@ -54,16 +53,15 @@ export default async function PaymentSuccessPage({ searchParams }: { searchParam
           <dd className="text-ink">{paid.amountLabel}</dd>
         </div>
       </dl>
+
+      {downloadPkg ? <DownloadAccessActivator orderId={order.id} token={order.statusToken} /> : null}
+
       <div className="mt-8 flex flex-wrap gap-3">
-        {downloadPkg ? (
-          <Link href="/download" className="btn btn-primary rounded-full px-6 py-3">
-            Download Center’a Dön
-          </Link>
-        ) : (
+        {!downloadPkg ? (
           <Link href="/" className="btn btn-primary rounded-full px-6 py-3">
             Ana Sayfaya Dön
           </Link>
-        )}
+        ) : null}
         <Link href="/contact?need=Sipariş%20Detayı" className="btn btn-secondary rounded-full px-6 py-3">
           Sipariş Detayları
         </Link>

@@ -1,5 +1,5 @@
 import { quoteProduct, type PaymentPeriod } from '@/lib/commerce-server';
-import { grantDownloadEntitlement } from '@/lib/downloads/store';
+import { grantDownloadEntitlement, revokeDownloadEntitlementsForOrder } from '@/lib/downloads/store';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 import { formatMinor } from '@/lib/money';
 import { publicBaseUrl, qnbpayConfig } from '@/lib/payments/config';
@@ -403,6 +403,7 @@ export async function refundPaidOrder(orderId: string): Promise<{ ok: boolean; m
   const result = await getPaymentProvider(order.paymentProvider).refundPayment(order);
   if (result.ok) {
     await updateOrder(order.id, { status: 'refunded' });
+    await revokeDownloadEntitlementsForOrder(order.id);
     await appendAudit({ orderId: order.id, provider: order.paymentProvider, event: 'refunded', status: 'refunded' });
   }
   return result;
