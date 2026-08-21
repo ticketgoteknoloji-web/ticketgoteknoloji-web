@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/pricing',
     '/technologies',
     '/projects',
+    '/download',
     '/contact',
     '/privacy',
     '/kvkk',

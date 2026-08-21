@@ -11,27 +11,19 @@ export function BrandLogo({ variant = 'header' }: BrandLogoProps) {
     <Link
       href="/"
       aria-label="TicketGo Teknoloji Ana Sayfa"
-      className="inline-flex shrink-0 self-center flex-col items-start bg-transparent py-1 gap-0 no-underline"
+      className="inline-flex shrink-0 flex-col items-start gap-0 self-center bg-transparent py-1 no-underline"
     >
-      {/* ticket + Go wordmark */}
       <span
-        className={`font-extrabold leading-none tracking-tight ${isHeader ? 'text-[26px] sm:text-[30px]' : 'text-[22px]'}`}
+        className={`font-sans font-bold leading-none tracking-tight ${isHeader ? 'text-[1.625rem] sm:text-[1.875rem]' : 'text-[1.375rem]'}`}
         aria-hidden="true"
       >
-        <span style={{ color: '#1e3a8a' }}>ticket</span>
-        <span style={{ color: '#0ea5e9' }}>Go</span>
+        <span className="text-[#1e3a8a]">ticket</span>
+        <span className="text-[#0ea5e9]">Go</span>
       </span>
-
-      {/* Teknoloji A.Ş. */}
       <span
-        className="font-medium leading-none"
-        style={{
-          color: '#1e3a8a',
-          fontSize: isHeader ? '11px' : '9px',
-          letterSpacing: '0.10em',
-          marginTop: '3px',
-          opacity: 0.75,
-        }}
+        className={`mt-0.5 font-sans font-medium leading-none tracking-[0.1em] text-[#1e3a8a]/75 ${
+          isHeader ? 'text-[0.6875rem]' : 'text-[0.5625rem]'
+        }`}
       >
         Teknoloji A.Ş.
       </span>

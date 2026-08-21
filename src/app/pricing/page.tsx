@@ -5,13 +5,13 @@ import { BRAND_LEGAL_NAME, BRAND_SITE_URL } from '@/lib/site';
 import { pricingCatalog } from '@/lib/pricing';
 
 const DESCRIPTION =
-  'Ticket-Go platformu, özel yazılım, AI entegrasyonu ve bakım paketleri için USD başlangıç fiyatları. Prices in USD. Taxes may apply.';
+  'Kurumsal yazılım platformu, özel yazılım, AI entegrasyonu ve bakım paketleri için USD başlangıç fiyatları. Prices in USD. Taxes may apply.';
 
 export const metadata: Metadata = {
   title: 'Fiyatlandırma',
   description: DESCRIPTION,
   alternates: { canonical: `${BRAND_SITE_URL}/pricing` },
-  keywords: ['yazılım fiyatlandırma', 'SaaS fiyat', 'özel yazılım maliyeti', 'Ticket-Go', 'AI entegrasyon fiyatı'],
+  keywords: ['yazılım fiyatlandırma', 'SaaS fiyat', 'özel yazılım maliyeti', 'AI entegrasyon fiyatı'],
   openGraph: {
     title: `Fiyatlandırma | ${BRAND_LEGAL_NAME}`,
     description:

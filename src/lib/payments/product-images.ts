@@ -6,9 +6,9 @@
 const BASE = '/images/payment/products';
 
 export const PAYMENT_PRODUCT_IMAGES: Record<string, { src: string; alt: string }> = {
-  'ticketgo-starter':     { src: `${BASE}/ticketgo-starter.webp`,     alt: 'Ticket-Go Starter rezervasyon platformu' },
-  'ticketgo-growth':      { src: `${BASE}/ticketgo-growth.webp`,      alt: 'Ticket-Go Growth B2B rezervasyon platformu' },
-  'ticketgo-scale':       { src: `${BASE}/ticketgo-scale.webp`,       alt: 'Ticket-Go Scale kurumsal platform' },
+  'ticketgo-starter':     { src: `${BASE}/ticketgo-starter.webp`,     alt: 'Platform Starter dijital ürün paketi' },
+  'ticketgo-growth':      { src: `${BASE}/ticketgo-growth.webp`,      alt: 'Platform Growth dijital ürün paketi' },
+  'ticketgo-scale':       { src: `${BASE}/ticketgo-scale.webp`,       alt: 'Platform Scale kurumsal paket' },
   'discovery':            { src: `${BASE}/discovery.webp`,            alt: 'Dijital ürün keşif ve analiz hizmeti' },
   'ai-starter':           { src: `${BASE}/ai-starter.webp`,           alt: 'Yapay zekâ entegrasyonu Starter paketi' },
   'ai-growth':            { src: `${BASE}/ai-growth.webp`,            alt: 'Yapay zekâ entegrasyonu Growth paketi' },

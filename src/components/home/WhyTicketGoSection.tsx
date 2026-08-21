@@ -12,11 +12,6 @@ const items = [
   featuresByIds(['why-data'])[0],
 ].filter((item): item is NonNullable<typeof item> => Boolean(item));
 
-const spans: Record<string, string> = {
-  'why-modular': 'md:col-span-2',
-  'why-data': 'md:col-span-2',
-};
-
 export function WhyTicketGoSection() {
   return (
     <section className="section-wrap section-y">
@@ -27,8 +22,7 @@ export function WhyTicketGoSection() {
       </p>
       <FeatureCardGrid
         items={items}
-        className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
-        getClassName={(item) => spans[item.id] ?? ''}
+        className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
       />
     </section>
   );

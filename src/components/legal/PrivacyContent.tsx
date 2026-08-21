@@ -1,17 +1,34 @@
 import Link from 'next/link';
-import { COMPANY, displayRegistry } from '@/config/company';
+import { COMPANY, displayRegistry, displayRegistryPreferValue, hasRegistryValue } from '@/config/company';
 import { LEGAL_VERSIONS, formatLegalDate } from '@/lib/legal/versions';
+
+export const PRIVACY_TOC = [
+  { id: 'veri-sorumlusu', label: '1. Veri Sorumlusu' },
+  { id: 'islenabilecek-kisisel-veri-kategorileri', label: '2. İşlenebilecek Kişisel Veri Kategorileri' },
+  { id: 'odeme-ve-finansal-islem-bilgileri', label: '3. Ödeme ve Finansal İşlem Bilgileri' },
+  { id: 'kisisel-verilerin-islenme-amaclari', label: '4. Kişisel Verilerin İşlenme Amaçları' },
+  { id: 'kisisel-verilerin-aktarilmasi', label: '5. Kişisel Verilerin Aktarılması' },
+  { id: 'kisisel-verilerin-toplanma-yontemi', label: '6. Kişisel Verilerin Toplanma Yöntemi' },
+  { id: 'kisisel-verilerin-islenmesinin-hukuki-sebepleri', label: '7. Hukuki Sebepler' },
+  { id: 'cerez-cookie-kullanimi', label: '8. Çerez (Cookie) Kullanımı' },
+  { id: 'kisisel-verilerin-saklanmasi', label: '9. Kişisel Verilerin Saklanması' },
+  { id: 'veri-guvenligi', label: '10. Veri Güvenliği' },
+  { id: 'ilgili-kisinin-haklari', label: '11. İlgili Kişinin Hakları' },
+  { id: 'kvkk-kapsaminda-basvuru', label: '12. KVKK Kapsamında Başvuru' },
+  { id: 'ucuncu-taraf-hizmet-ve-baglantilar', label: '13. Üçüncü Taraf Hizmet ve Bağlantılar' },
+  { id: 'politika-guncellemeleri', label: '14. Politika Güncellemeleri' },
+] as const;
 
 /**
  * PrivacyContent — single source of truth for Gizlilik Politikası.
- * Used in both /privacy page and PrivacyModal overlay.
+ * Used in both /privacy page and LegalModal overlay.
  */
-export function PrivacyContent() {
+export function PrivacyContent({ omitChrome = false }: { omitChrome?: boolean }) {
   const doc = LEGAL_VERSIONS.privacy;
 
   return (
-    <div className="space-y-8 text-sm leading-7 text-ink">
-      {/* ── Meta ── */}
+    <div className={omitChrome ? 'legal-content-modal space-y-8 text-sm leading-7 text-ink' : 'space-y-8 text-sm leading-7 text-ink'}>
+      {!omitChrome ? (
       <div className="border-b border-line pb-6">
         <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">
           {COMPANY.legalName}
@@ -32,10 +49,11 @@ export function PrivacyContent() {
           işlenebileceğine ilişkin genel bilgilendirmeyi içermektedir.
         </p>
       </div>
+      ) : null}
 
       {/* ── 1. Veri Sorumlusu ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">1. Veri Sorumlusu</h3>
+      <section id="veri-sorumlusu" className="scroll-mt-28">
+        <h3 className="legal-h3">1. Veri Sorumlusu</h3>
         <p className="mt-2 text-muted">
           6698 sayılı Kişisel Verilerin Korunması Kanunu (&ldquo;KVKK&rdquo;) uyarınca,{' '}
           <a href={COMPANY.websiteUrl} className="font-semibold text-brand-600">
@@ -55,14 +73,16 @@ export function PrivacyContent() {
               <dt className="font-medium text-ink">Adres</dt>
               <dd className="text-muted">{displayRegistry(COMPANY.address)}</dd>
             </div>
+            {hasRegistryValue(COMPANY.phone) ? (
             <div className="grid gap-1 sm:grid-cols-[160px_1fr]">
               <dt className="font-medium text-ink">Telefon</dt>
               <dd className="text-muted">
                 <a href={COMPANY.phoneHref} className="font-semibold text-brand-600">
-                  {displayRegistry(COMPANY.phone)}
+                  {displayRegistryPreferValue(COMPANY.phone)}
                 </a>
               </dd>
             </div>
+            ) : null}
             <div className="grid gap-1 sm:grid-cols-[160px_1fr]">
               <dt className="font-medium text-ink">Web Sitesi</dt>
               <dd className="text-muted">
@@ -112,8 +132,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 2. İşlenebilecek Kişisel Veri Kategorileri ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">2. İşlenebilecek Kişisel Veri Kategorileri</h3>
+      <section id="islenabilecek-kisisel-veri-kategorileri" className="scroll-mt-28">
+        <h3 className="legal-h3">2. İşlenebilecek Kişisel Veri Kategorileri</h3>
         <p className="mt-2 text-muted">
           {COMPANY.legalName}, yürütülen faaliyetin gerektirdiği ölçüde aşağıdaki kişisel veri kategorilerini
           işleyebilir:
@@ -169,8 +189,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 3. Ödeme Bilgileri ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">3. Ödeme ve Finansal İşlem Bilgileri</h3>
+      <section id="odeme-ve-finansal-islem-bilgileri" className="scroll-mt-28">
+        <h3 className="legal-h3">3. Ödeme ve Finansal İşlem Bilgileri</h3>
         <p className="mt-2 text-muted">
           {COMPANY.websiteDisplay} üzerinden gerçekleştirilebilecek kartlı ödeme işlemleri, ilgili banka ve/veya
           yetkili ödeme altyapısı üzerinden yürütülmektedir. Ödeme işlemlerinde QNBpay / QNB Sanal POS altyapısı
@@ -193,8 +213,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 4. İşleme Amaçları ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">4. Kişisel Verilerin İşlenme Amaçları</h3>
+      <section id="kisisel-verilerin-islenme-amaclari" className="scroll-mt-28">
+        <h3 className="legal-h3">4. Kişisel Verilerin İşlenme Amaçları</h3>
         <p className="mt-2 text-muted">Kişisel veriler, ilgili faaliyete göre aşağıdaki amaçlarla işlenebilir:</p>
         <ul className="mt-2 list-disc space-y-1.5 pl-5 text-muted">
           <li>İletişim ve bilgi taleplerinin karşılanması</li>
@@ -219,8 +239,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 5. Aktarım ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">5. Kişisel Verilerin Aktarılması</h3>
+      <section id="kisisel-verilerin-aktarilmasi" className="scroll-mt-28">
+        <h3 className="legal-h3">5. Kişisel Verilerin Aktarılması</h3>
         <p className="mt-2 text-muted">
           Kişisel veriler, ilgili hizmetin yürütülmesi ve yasal yükümlülüklerin yerine getirilmesi amacıyla gerekli
           olduğu ölçüde ve KVKK&apos;nın ilgili hükümleri çerçevesinde üçüncü taraflara aktarılabilir.
@@ -244,8 +264,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 6. Toplama Yöntemi ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">6. Kişisel Verilerin Toplanma Yöntemi</h3>
+      <section id="kisisel-verilerin-toplanma-yontemi" className="scroll-mt-28">
+        <h3 className="legal-h3">6. Kişisel Verilerin Toplanma Yöntemi</h3>
         <p className="mt-2 text-muted">Kişisel veriler aşağıdaki kanallardan elde edilebilir:</p>
         <ul className="mt-1 list-disc space-y-1.5 pl-5 text-muted">
           <li>{COMPANY.websiteDisplay} web sitesi</li>
@@ -263,8 +283,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 7. Hukuki Sebepler ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">7. Kişisel Verilerin İşlenmesinin Hukuki Sebepleri</h3>
+      <section id="kisisel-verilerin-islenmesinin-hukuki-sebepleri" className="scroll-mt-28">
+        <h3 className="legal-h3">7. Kişisel Verilerin İşlenmesinin Hukuki Sebepleri</h3>
         <p className="mt-2 text-muted">
           Kişisel veriler, ilgili işleme faaliyetine göre KVKK&apos;nın 5. maddesinde öngörülen şartlardan uygun
           olanlara dayanılarak işlenebilir:
@@ -282,8 +302,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 8. Çerezler ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">8. Çerez (Cookie) Kullanımı</h3>
+      <section id="cerez-cookie-kullanimi" className="scroll-mt-28">
+        <h3 className="legal-h3">8. Çerez (Cookie) Kullanımı</h3>
         <p className="mt-2 text-muted">
           {COMPANY.websiteDisplay}; internet sitesinin çalışmasını sağlamak, güvenliği korumak, tercihleri
           hatırlamak ve teknik performansı değerlendirmek amacıyla çerezlerden yararlanabilir.
@@ -304,8 +324,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 9. Saklama ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">9. Kişisel Verilerin Saklanması</h3>
+      <section id="kisisel-verilerin-saklanmasi" className="scroll-mt-28">
+        <h3 className="legal-h3">9. Kişisel Verilerin Saklanması</h3>
         <p className="mt-2 text-muted">
           Kişisel veriler, ilgili işleme amacının gerektirdiği süre boyunca ve varsa mevzuatta öngörülen saklama
           süreleriyle sınırlı olarak muhafaza edilir. İşleme amacı ve yasal saklama gerekliliği sona erdiğinde
@@ -315,8 +335,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 10. Güvenlik ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">10. Veri Güvenliği</h3>
+      <section id="veri-guvenligi" className="scroll-mt-28">
+        <h3 className="legal-h3">10. Veri Güvenliği</h3>
         <p className="mt-2 text-muted">
           {COMPANY.legalName}; kişisel verilerin hukuka aykırı biçimde işlenmesini veya erişilmesini önlemek ve
           verilerin güvenli şekilde muhafazasını sağlamak amacıyla, işlenen verinin ve sistemin niteliğine uygun
@@ -337,8 +357,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 11. Haklar ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">11. İlgili Kişinin Hakları</h3>
+      <section id="ilgili-kisinin-haklari" className="scroll-mt-28">
+        <h3 className="legal-h3">11. İlgili Kişinin Hakları</h3>
         <p className="mt-2 text-muted">KVKK&apos;nın 11. maddesi kapsamında aşağıdaki haklara sahipsiniz:</p>
         <ul className="mt-2 list-disc space-y-1.5 pl-5 text-muted">
           <li>Kişisel verilerinizin işlenip işlenmediğini öğrenme</li>
@@ -369,8 +389,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 12. Başvuru ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">12. KVKK Kapsamında Başvuru</h3>
+      <section id="kvkk-kapsaminda-basvuru" className="scroll-mt-28">
+        <h3 className="legal-h3">12. KVKK Kapsamında Başvuru</h3>
         <p className="mt-2 text-muted">
           KVKK kapsamındaki başvurularınızı {COMPANY.legalName}&apos;ye aşağıdaki iletişim kanalları üzerinden
           iletebilirsiniz:
@@ -408,8 +428,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 13. Üçüncü Taraf ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">13. Üçüncü Taraf Hizmet ve Bağlantılar</h3>
+      <section id="ucuncu-taraf-hizmet-ve-baglantilar" className="scroll-mt-28">
+        <h3 className="legal-h3">13. Üçüncü Taraf Hizmet ve Bağlantılar</h3>
         <p className="mt-2 text-muted">
           {COMPANY.websiteDisplay} üzerinde üçüncü taraf hizmetlere, ödeme altyapılarına veya iletişim
           platformlarına yönlendiren bağlantılar bulunabilir. Kullanıcı üçüncü taraf bir servise
@@ -419,8 +439,8 @@ export function PrivacyContent() {
       </section>
 
       {/* ── 14. Politika Güncellemeleri ── */}
-      <section>
-        <h3 className="text-base font-semibold text-ink">14. Politika Güncellemeleri</h3>
+      <section id="politika-guncellemeleri" className="scroll-mt-28">
+        <h3 className="legal-h3">14. Politika Güncellemeleri</h3>
         <p className="mt-2 text-muted">
           {COMPANY.legalName}, işbu Gizlilik ve Kişisel Verilerin Korunması Politikası&apos;nı mevzuat,
           teknolojik altyapı veya hizmet süreçlerinde meydana gelen değişiklikler doğrultusunda güncelleyebilir.

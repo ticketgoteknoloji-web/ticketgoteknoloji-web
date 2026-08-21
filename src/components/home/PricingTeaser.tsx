@@ -11,8 +11,8 @@ export function PricingTeaser() {
     <section id="fiyatlandirma" className="section-wrap section-y scroll-section">
       <h2 className="section-title">Şeffaf başlangıç fiyatları</h2>
       <p className="section-subtitle">
-        Ticket-Go platform paketleri tanımlı tutarla satın alınabilir. Özel yazılım, CRM ve kapsamı netleşmemiş işler teklif
-        formuna gider.
+        Platform paketleri tanımlı tutarla satın alınabilir. Özel yazılım, CRM ve kapsamı netleşmemiş işler teklif formuna
+        gider.
       </p>
       <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {featured.map((item) => (

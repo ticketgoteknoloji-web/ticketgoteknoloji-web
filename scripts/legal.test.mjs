@@ -8,12 +8,15 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const distance = readFileSync(join(root, 'src/app/legal/distance-sales/page.tsx'), 'utf8');
 const pre = readFileSync(join(root, 'src/app/legal/pre-information/page.tsx'), 'utf8');
 const refund = readFileSync(join(root, 'src/app/legal/refund/page.tsx'), 'utf8');
-const kvkk = readFileSync(join(root, 'src/app/kvkk/page.tsx'), 'utf8');
-const privacy = readFileSync(join(root, 'src/app/privacy/page.tsx'), 'utf8');
+const kvkkPage = readFileSync(join(root, 'src/app/kvkk/page.tsx'), 'utf8');
+const kvkk = readFileSync(join(root, 'src/components/legal/KvkkContent.tsx'), 'utf8');
+const privacy = readFileSync(join(root, 'src/components/legal/PrivacyContent.tsx'), 'utf8');
+const footer = readFileSync(join(root, 'src/components/PublicFooter.tsx'), 'utf8');
 const checkout = readFileSync(join(root, 'src/components/payment/PaymentCheckout.tsx'), 'utf8');
 const company = readFileSync(join(root, 'src/config/company.ts'), 'utf8');
 const versions = readFileSync(join(root, 'src/lib/legal/versions.ts'), 'utf8');
 const globals = readFileSync(join(root, 'src/app/globals.css'), 'utf8');
+const shell = readFileSync(join(root, 'src/components/legal/LegalDocument.tsx'), 'utf8');
 
 test('distance sales contract has required sections', () => {
   for (const heading of [
@@ -45,16 +48,18 @@ test('refund policy avoids blanket digital no-refund', () => {
 });
 
 test('KVKK and privacy are separate documents', () => {
-  assert.match(kvkk, /Veri sorumlusu/);
-  assert.match(kvkk, /Hukuki sebepler/);
+  assert.match(kvkkPage, /LegalPageShell/);
+  assert.match(kvkk, /Veri Sorumlusu/);
+  assert.match(kvkk, /Hukuki Sebepler/);
   assert.match(kvkk, /COMPANY\.emails\.kvkk/);
-  assert.match(privacy, /Politikanın kapsamı/);
-  assert.match(privacy, /kendi sistemlerinde saklamaz/);
+  assert.match(kvkk, /CompanyInfoPanel/);
+  assert.match(privacy, /Kişisel Verilerin İşlenme Amaçları/);
+  assert.match(privacy, /saklamayı amaçlamaz/);
   assert.doesNotMatch(privacy, /title="Hukuki sebepler"/);
 });
 
 test('checkout splits contract consent from KVKK notice', () => {
-  assert.match(checkout, /siparişe ve ödeme yükümlülüğüne ilişkin koşulları kabul ediyorum/);
+  assert.match(checkout, /siparişe ve ödeme yükümlülüklerine ilişkin koşulları kabul ediyorum/);
   assert.match(checkout, /Kişisel verilerinizin işlenmesine ilişkin detayları/);
   assert.match(checkout, /Kampanya ve duyurular hakkında elektronik ileti/);
   assert.match(checkout, /Güvenli Ödeme Yap/);
@@ -82,10 +87,16 @@ test('company registry placeholders are centralized', () => {
   assert.match(site, /0843093110800001/);
   assert.match(site, /Gümbet Mah\. Mister Hadi Sok\. No:2-A1 Bodrum\/MUĞLA/);
   assert.match(distance, /SATICI BİLGİLERİ/);
-  assert.match(kvkk, /CompanyInfoPanel/);
   assert.match(versions, /2026\.08-v1/);
 });
 
-test('print stylesheet exists', () => {
+test('legal shell and footer are corporate-only', () => {
+  assert.match(shell, /LegalPageShell/);
+  assert.match(globals, /\.legal-shell/);
   assert.match(globals, /@media print/);
+  assert.match(footer, /Yasal/);
+  assert.match(footer, /href: '\/terms'/);
+  assert.match(footer, /href: '\/kvkk'/);
+  assert.doesNotMatch(footer, /Ticket-Go/);
+  assert.doesNotMatch(footer, /ticket-go\.net/);
 });

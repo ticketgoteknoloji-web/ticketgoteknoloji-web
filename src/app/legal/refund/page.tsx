@@ -16,6 +16,21 @@ export default function RefundPage() {
     <LegalDocument
       doc={LEGAL_VERSIONS.refund}
       intro="TicketGo Teknoloji A.Ş. üzerinden gerçekleştirilen satın alma işlemlerinde iptal, cayma ve iade süreçleri; satın alınan ürün veya hizmetin niteliğine ve yürürlükteki tüketici mevzuatına göre değerlendirilir."
+      tableOfContents={[
+        { id: 'satici-hizmet-saglayici-bilgileri', label: 'Satıcı / hizmet sağlayıcı bilgileri' },
+        { id: '1-genel-ilkeler', label: '1. Genel ilkeler' },
+        { id: '2-cayma-hakki', label: '2. Cayma hakkı' },
+        { id: '3-dijital-urun-ve-hizmetler', label: '3. Dijital ürün ve hizmetler' },
+        { id: '4-hizmetin-ifasina-baslanmasi', label: '4. Hizmetin ifasına başlanması' },
+        { id: '5-cayma-hakkinin-bulunmadigi-durumlar', label: '5. Cayma hakkının bulunmadığı durumlar' },
+        { id: '6-iade-talebi-nasil-yapilir', label: '6. İade talebi nasıl yapılır?' },
+        { id: '7-iade-sureci', label: '7. İade süreci' },
+        { id: '8-odeme-yontemine-iade', label: '8. Ödeme yöntemine iade' },
+        { id: '9-kismi-iadeler', label: '9. Kısmi iadeler' },
+        { id: '10-teknik-sorunlar', label: '10. Teknik sorunlar' },
+        { id: '11-hatali-mukerrer-odeme', label: '11. Hatalı / mükerrer ödeme' },
+        { id: '12-destek', label: '12. Destek' },
+      ]}
     >
       <LegalSection title="Satıcı / hizmet sağlayıcı bilgileri">
         <CompanyInfoPanel title="Satıcı bilgileri" showInfo={false} />

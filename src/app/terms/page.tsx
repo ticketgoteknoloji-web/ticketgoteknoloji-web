@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { LegalPageShell, LegalSection } from '@/components/legal/LegalDocument';
 import { BRAND_LEGAL_NAME, BRAND_SITE_URL } from '@/lib/site';
 
 export const metadata: Metadata = {
@@ -7,21 +8,40 @@ export const metadata: Metadata = {
   alternates: { canonical: `${BRAND_SITE_URL}/terms` },
 };
 
+const TOC = [
+  { id: 'kabul', label: 'Kabul' },
+  { id: 'fikri-mulkiyet', label: 'Fikri mülkiyet' },
+  { id: 'bilgilendirme-amaci', label: 'Bilgilendirme amacı' },
+] as const;
+
 export default function TermsPage() {
   return (
-    <main className="legal-document mx-auto w-full max-w-[920px] px-4 py-12 sm:px-6 sm:py-16">
-      <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Kullanım Koşulları</h1>
-      <article className="mt-8 space-y-6 text-base leading-8 text-muted">
+    <LegalPageShell
+      title="Kullanım Koşulları"
+      eyebrow="Kullanım"
+      description={`${BRAND_LEGAL_NAME} kurumsal web sitesinin kullanımına ilişkin temel koşullar.`}
+      lastUpdated="2026-08-18"
+      tableOfContents={[...TOC]}
+      showRegistryNotice={false}
+    >
+      <LegalSection id="kabul" title="Kabul">
         <p>
-          Bu web sitesini kullanan tüm ziyaretçiler, {BRAND_LEGAL_NAME} tarafından yayınlanan kullanım koşullarını kabul etmiş sayılır.
+          Bu web sitesini kullanan tüm ziyaretçiler, {BRAND_LEGAL_NAME} tarafından yayınlanan kullanım koşullarını kabul
+          etmiş sayılır.
         </p>
+      </LegalSection>
+      <LegalSection id="fikri-mulkiyet" title="Fikri mülkiyet">
         <p>
-          Sitede yer alan içeriklerin fikri mülkiyet hakları saklıdır. İzinsiz kopyalama, dağıtım veya ticari kullanım yapılamaz.
+          Sitede yer alan içeriklerin fikri mülkiyet hakları saklıdır. İzinsiz kopyalama, dağıtım veya ticari kullanım
+          yapılamaz.
         </p>
+      </LegalSection>
+      <LegalSection id="bilgilendirme-amaci" title="Bilgilendirme amacı">
         <p>
-          İçerikler bilgilendirme amacı taşır. Proje, hizmet kapsamı ve teklif süreçleri ayrıca yazılı mutabakat ile yürütülür.
+          İçerikler bilgilendirme amacı taşır. Proje, hizmet kapsamı ve teklif süreçleri ayrıca yazılı mutabakat ile
+          yürütülür.
         </p>
-      </article>
-    </main>
+      </LegalSection>
+    </LegalPageShell>
   );
 }

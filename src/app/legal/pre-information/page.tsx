@@ -28,6 +28,21 @@ export default async function PreInformationPage({ searchParams }: { searchParam
     <LegalDocument
       doc={doc}
       intro="Bu form, ödeme yükümlülüğü doğmadan önce satıcı, bedel, ifa ve cayma konularında özet bilgi vermek üzere hazırlanmıştır. Ayrıntılar Mesafeli Satış Sözleşmesi’ndedir."
+      tableOfContents={[
+        { id: 'satici-hizmet-saglayici', label: 'SATICI / HİZMET SAĞLAYICI' },
+        { id: 'satin-alinan-urun-veya-hizmet', label: 'Satın alınan ürün veya hizmet' },
+        { id: 'toplam-fiyat', label: 'Toplam fiyat' },
+        { id: 'vergiler', label: 'Vergiler' },
+        { id: 'varsa-ilave-masraflar', label: 'Varsa ilave masraflar' },
+        { id: 'odeme-yontemi', label: 'Ödeme yöntemi' },
+        { id: 'ifa-teslim-sekli', label: 'İfa / teslim şekli' },
+        { id: 'ifa-teslim-suresi', label: 'İfa / teslim süresi' },
+        { id: 'cayma-hakki', label: 'Cayma hakkı' },
+        { id: 'cayma-bildiriminin-yapilacagi-iletisim-kanali', label: 'Cayma bildiriminin yapılacağı iletişim kanalı' },
+        { id: 'cayma-hakkinin-istisnalari', label: 'Cayma hakkının istisnaları' },
+        { id: 'iade-sureci', label: 'İade süreci' },
+        { id: 'sikayet-ve-destek', label: 'Şikâyet ve destek' },
+      ]}
     >
       <LegalSection title="SATICI / HİZMET SAĞLAYICI">
         <CompanyInfoPanel title="Satıcı bilgileri" />

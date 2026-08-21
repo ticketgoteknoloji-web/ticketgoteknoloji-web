@@ -4,5 +4,8 @@ out
 .env
 .env*.local
 .data
+.storage
+storage/downloads/*
+!storage/downloads/.gitkeep
 *.log
 .DS_Store

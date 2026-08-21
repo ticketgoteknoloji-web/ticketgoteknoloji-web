@@ -14,22 +14,24 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
   return (
     <LegalModalProvider>
       <ContactModalProvider>
-        {checkout ? null : (
-          <div className="print:hidden">
-            <Navbar />
-          </div>
-        )}
-        {checkout ? <div className="payment-shell">{children}</div> : children}
-        {checkout ? null : (
-          <div className="print:hidden">
-            <PublicFooter />
-          </div>
-        )}
-        {checkout ? null : (
-          <div className="print:hidden">
-            <BackToTop />
-          </div>
-        )}
+        <div className="relative z-[1]">
+          {checkout ? null : (
+            <div className="print:hidden">
+              <Navbar />
+            </div>
+          )}
+          {checkout ? <div className="payment-shell">{children}</div> : children}
+          {checkout ? null : (
+            <div className="print:hidden">
+              <PublicFooter />
+            </div>
+          )}
+          {checkout ? null : (
+            <div className="print:hidden">
+              <BackToTop />
+            </div>
+          )}
+        </div>
       </ContactModalProvider>
     </LegalModalProvider>
   );

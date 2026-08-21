@@ -7,7 +7,7 @@ import { SolutionsSection } from '@/components/home/SolutionsSection';
 export const metadata: Metadata = {
   title: 'Ürünler / Projeler',
   description:
-    'Ticket-Go rezervasyon ve biletleme platformu ile TicketGo Teknoloji A.Ş. tarafından geliştirilebilen kurumsal yazılım, CRM ve dijital platform senaryoları.',
+    'TicketGo Teknoloji A.Ş. tarafından geliştirilebilen kurumsal yazılım, CRM, SaaS ve dijital platform senaryoları.',
   alternates: { canonical: `${BRAND_SITE_URL}/projects` },
 };
 
@@ -17,11 +17,11 @@ export default function ProjectsPage() {
       <section className="section-wrap section-y">
         <h1 className="section-title">Ürünler / Projeler</h1>
         <p className="section-subtitle">
-          Ticket-Go, TicketGo Teknoloji A.Ş. tarafından geliştirilen bir ürün örneğidir. Şirket bu ürünle sınırlı değildir;
-          aşağıdaki başlıklar geliştirebildiğimiz çözüm türlerini temsil eder.
+          TicketGo Teknoloji A.Ş. uçtan uca dijital ürünler geliştirir. Aşağıdaki başlıklar geliştirebildiğimiz çözüm
+          türlerini temsil eder; şirket tek bir ürünle sınırlı değildir.
         </p>
         <div className="mt-10">
-          <TicketGoProduct heading="Ticket-Go" />
+          <TicketGoProduct heading="Dijital Platform Ürün Omurgası" />
         </div>
       </section>
       <SolutionsSection />

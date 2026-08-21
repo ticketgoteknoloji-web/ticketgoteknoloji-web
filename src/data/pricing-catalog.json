@@ -21,7 +21,7 @@
       "category": "ticketgo",
       "model": "hybrid-saas-starting-at",
       "headline": "Tek kanal, net operasyon",
-      "description": "Tek satış kanalı ve sınırlı operatör ekibi için Ticket-Go benzeri rezervasyon altyapısının başlangıç kurulumudur. Kapsam, keşif sonrası netleşir.",
+      "description": "Tek satış kanalı ve sınırlı operatör ekibi için kurumsal rezervasyon / operasyon platformunın başlangıç kurulumudur. Kapsam, keşif sonrası netleşir.",
       "monthlyPrice": 249,
       "startingAt": true,
       "customQuote": false,
@@ -30,8 +30,8 @@
       "minimum": 199,
       "premium": 349,
       "ctaLabel": "Starter'ı Seçin",
-      "contactType": "Ticket-Go Starter",
-      "ctaMessage": "Ticket-Go Starter paketi hakkında teklif almak istiyorum.",
+      "contactType": "Platform Starter",
+      "ctaMessage": "Platform Starter paketi hakkında teklif almak istiyorum.",
       "features": [
         "En fazla 3 operatör kullanıcısı",
         "Ayda 2.000 biletleme kaydı",
@@ -95,8 +95,8 @@
       "minimum": 690,
       "premium": 990,
       "ctaLabel": "Growth'u Seçin",
-      "contactType": "Ticket-Go Growth",
-      "ctaMessage": "Ticket-Go Growth paketi hakkında teklif almak istiyorum.",
+      "contactType": "Platform Growth",
+      "ctaMessage": "Platform Growth paketi hakkında teklif almak istiyorum.",
       "features": [
         "En fazla 10 operatör kullanıcısı",
         "Ayda 10.000 biletleme kaydı",
@@ -158,8 +158,8 @@
       "minimum": 1490,
       "premium": 2190,
       "ctaLabel": "Scale'i Seçin",
-      "contactType": "Ticket-Go Scale",
-      "ctaMessage": "Ticket-Go Scale paketi hakkında teklif almak istiyorum.",
+      "contactType": "Platform Scale",
+      "ctaMessage": "Platform Scale paketi hakkında teklif almak istiyorum.",
       "features": [
         "Anlaşmalı kullanıcı limiti (başlangıç 25)",
         "Ayda 50.000 biletleme kaydı",
@@ -217,8 +217,8 @@
       "minimum": 2500,
       "premium": null,
       "ctaLabel": "Satış ile Görüşün",
-      "contactType": "Ticket-Go Enterprise",
-      "ctaMessage": "Ticket-Go Enterprise / özel SLA hakkında görüşmek istiyorum.",
+      "contactType": "Platform Enterprise",
+      "ctaMessage": "Platform Enterprise / özel SLA hakkında görüşmek istiyorum.",
       "features": [
         "Özel kullanıcı ve hacim limiti",
         "Kurumsal SSO / yetki modeli",
@@ -458,7 +458,7 @@
     {
       "id": "extra-operator-seat",
       "name": "Ek operatör kullanıcısı",
-      "description": "Ticket-Go paket kullanıcı limitinin üzerindeki her ek operatör koltuğu.",
+      "description": "Platform paket kullanıcı limitinin üzerindeki her ek operatör koltuğu.",
       "price": 99,
       "priceUsd": 99,
       "periodLabel": "/ kullanıcı",
@@ -466,7 +466,7 @@
       "unit": "USD / kullanıcı",
       "startingAt": false,
       "contactType": "Ek Kullanıcı",
-      "ctaMessage": "Ticket-Go için ek operatör kullanıcısı eklemek istiyorum."
+      "ctaMessage": "Platform için ek operatör kullanıcısı eklemek istiyorum."
     },
     {
       "id": "extra-support-hour",
@@ -584,21 +584,21 @@
   "setupFees": [
     {
       "id": "ticketgo-starter-setup",
-      "name": "Ticket-Go Starter kurulum",
+      "name": "Platform Starter kurulum",
       "price": 2900,
       "customQuote": false,
       "notes": "Tek seferlik onboarding, ortam ve standart akış kurulumu."
     },
     {
       "id": "ticketgo-growth-setup",
-      "name": "Ticket-Go Growth kurulum",
+      "name": "Platform Growth kurulum",
       "price": 6500,
       "customQuote": false,
       "notes": "B2B ve operasyon ekranlarını içeren onboarding."
     },
     {
       "id": "ticketgo-scale-setup",
-      "name": "Ticket-Go Scale kurulum",
+      "name": "Platform Scale kurulum",
       "price": 12000,
       "customQuote": false,
       "notes": "API, yetki ve ek ortam topolojisini içeren onboarding."
@@ -930,7 +930,7 @@
     "Şirketin iç maliyet muhasebesi, gerçek brüt marjı ve doluluk oranı bu çalışmada mevcut değildir.",
     "Hedef brüt marj yazılım aboneliklerinde en az %65; keşif/MVP gibi emek yoğun hizmetlerde %55–65 aralığı varsayılmıştır.",
     "Yüklü iç maliyet varsayımı: 50 TL/saat (kıdemli karma ekip, Türkiye merkezli teslimat, 2026-08-18).",
-    "Ticket-Go genel amaçlı self-servis checkout ile satılmamaktadır; fiyatlar başlangıç teklifidir ve keşif sonrası netleşir.",
+    "Platform paketleri genel amaçlı self-servis checkout ile satılmamaktadır; fiyatlar başlangıç teklifidir ve keşif sonrası netleşir.",
     "Ödeme kuruluşu, SMS operatörü, bulut aşımı ve LLM sağlayıcı faturaları müşteriye yansıtılır veya kotaya gömülür; gömülü kotada model fiyatı artarsa kota düşürülebilir.",
     "Yıllık indirim ürün ve bakımda %20, AI ve dedicated team için %15 uygulanır.",
     "KDV (%20) fiyatlara ödeme aşamasında eklenir; katalog fiyatları KDV hariçtir.",
@@ -950,7 +950,7 @@
       "answer": "Ürün ve bakım paketlerinde yıllık peşin ödeme, aylık listenin %20 altındadır. AI ve Dedicated Team için indirim %15’tir. Gösterilen tasarruf bu oranlardan hesaplanır."
     },
     {
-      "question": "Ticket-Go ücretsiz deneme içeriyor mu?",
+      "question": "Platform paketleri ücretsiz deneme içeriyor mu?",
       "answer": "Self-servis ücretsiz plan yoktur. İhtiyaç halinde demo ve keşif görüşmesi planlanır. Discovery paketi, kapsamı ücretli ve sınırlı biçimde netleştirir."
     },
     {

@@ -15,7 +15,6 @@ import {
   Truck,
   Workflow,
 } from 'lucide-react';
-import { PRODUCT_TICKET_GO, PRODUCT_TICKET_GO_URL } from '@/lib/site';
 import type { SolutionDetail } from '@/data/solutions';
 
 const sectorMeta = {
@@ -37,6 +36,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Ulaşım işletmelerinin rezervasyondan operasyona, müşteri deneyiminden raporlamaya kadar farklı süreçlerini dijital ortamda yönetebilecek sistemler tasarlanabilir. Amaç; sefer, kapasite, bilet ve saha operasyonunu kopuk tablolardan çıkarıp izlenebilir bir ürüne dönüştürmektir.',
     Icon: Bus,
+    cardImage: '/images/solutions/booking-ticketing.webp',
     ...sectorMeta,
     hoverHints: ['Rezervasyon', 'Biletleme', 'Operasyon'],
     features: [
@@ -79,9 +79,9 @@ export const sectorSolutions: SolutionDetail[] = [
       'Bilet ve iptal işlemleri loglanır; ortamlar birbirinden ayrı tutulur.',
     ],
     productExample: {
-      title: PRODUCT_TICKET_GO,
-      text: 'TicketGo Teknoloji tarafından geliştirilen; rezervasyon, elektronik biletleme, B2B ve operasyon süreçlerini bir araya getiren dijital platform.',
-      href: PRODUCT_TICKET_GO_URL,
+      title: 'Dijital Platform',
+      text: 'TicketGo Teknoloji tarafından geliştirilen; rezervasyon, satış, B2B ve operasyon süreçlerini bir araya getiren dijital ürün omurgası.',
+      href: '/solutions',
     },
     ctaLabel: 'Ulaşım Teknolojisi Projenizi Konuşalım',
     contactType: 'Ulaşım & Mobilite',
@@ -95,6 +95,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Turizm ve konaklama süreçlerinde müsaitlik, rezervasyon, hizmet ve misafir kaydı çoğu zaman ayrı araçlarda yürür. Tasarlanabilecek dijital ürünler; otel, tur, transfer veya acente operasyonunu tek rezervasyon omurgasında birleştirmeyi hedefler.',
     Icon: Hotel,
+    cardImage: '/images/solutions/customer-portal.webp',
     ...sectorMeta,
     hoverHints: ['Rezervasyon', 'CRM', 'Kanal entegrasyonu'],
     features: [
@@ -143,6 +144,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Fiziksel ve dijital satış kanallarındaki müşteri, ürün, satış ve operasyon verilerinin merkezi sistemlerde yönetilmesine yönelik çözümler tasarlanabilir. Amaç; kasanın, kampanyanın ve müşteri kaydının birbirini görmesini sağlamaktır.',
     Icon: Store,
+    cardImage: '/images/solutions/customer-sales.webp',
     ...sectorMeta,
     features: [
       'Müşteri CRM',
@@ -186,6 +188,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'E-ticaret tarafında vitrin kadar siparişin ERP’ye, kargoya ve müşteri kaydına düşmesi de işin parçasıdır. Tasarlanabilecek çözümler; mağaza, pazaryeri ve operasyon sistemleri arasında bütünlük kurmayı hedefler.',
     Icon: ShoppingBag,
+    cardImage: '/images/solutions/ecommerce-integrations.webp',
     ...sectorMeta,
     hoverHints: ['Ürün yönetimi', 'Sipariş', 'Ödeme'],
     features: [
@@ -234,6 +237,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Bu alan bankacılık hizmeti veya finansal ürün satışı değildir. Odak; işletmenin tahsilat, fatura, onay ve rapor adımlarını yazılımla kayıt altına almak, ERP ve ödeme servisleriyle konuşturmaktır.',
     Icon: Landmark,
+    cardImage: '/images/payment/payment-bank.webp',
     ...sectorMeta,
     features: [
       'Tahsilat takibi',
@@ -277,6 +281,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Tıbbi teşhis veya tedavi hizmeti sunulmaz. Tasarlanabilecek sistemler; randevu, danışan iletişimi, takvim ve operasyon panelini güvenli bir yetki modelinde birleştirmeyi hedefler. Kişisel sağlık verisi KVKK kapsamında özel önem taşır.',
     Icon: HeartPulse,
+    cardImage: '/images/solutions/management-dashboard.webp',
     ...sectorMeta,
     features: [
       'Randevu yönetimi',
@@ -319,6 +324,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Dağıtımda siparişin kime atandığı, aracın nerede olduğu ve müşterinin ne zaman haberdar edildiği sıkça ayrı kanallarda kalır. Tasarlanabilecek çözümler; planlama, atama ve teslimat durumunu tek operasyon kaydında toplamayı amaçlar.',
     Icon: Truck,
+    cardImage: '/images/solutions/operations-platform.webp',
     ...sectorMeta,
     features: [
       'Sipariş yönetimi',
@@ -362,6 +368,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Gayrimenkul satışında ilan, talep ve görüşme kaydı çoğu zaman danışmanın kişisel listesinde durur. Tasarlanabilecek sistemler; portföy, müşteri talebi ve eşleştirmeyi ortak bir pipeline’da görünür kılmayı hedefler.',
     Icon: Home,
+    cardImage: '/images/solutions/crm-platform.webp',
     ...sectorMeta,
     features: [
       'Portföy yönetimi',
@@ -406,6 +413,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Endüstriyel makine kontrolü veya PLC yazılımı iddiası yoktur. Odak; iş emri, operasyon takibi, kalite kontrol ve stok/ERP bağlantısını yöneten kurumsal yazılımlardır. Saha ile planlamanın aynı kaydı görmesi hedeflenir.',
     Icon: Factory,
+    cardImage: '/images/solutions/custom-software.webp',
     ...sectorMeta,
     features: [
       'İş emri yönetimi',
@@ -449,6 +457,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Eğitim kurumları ve dijital kurs yapılarında öğrenci, içerik ve ödeme çoğu zaman ayrı panellerde durur. Tasarlanabilecek çözümler; kayıt, içerik erişimi, ilerleme ve raporlamayı tek kullanıcı deneyiminde birleştirmeyi hedefler.',
     Icon: GraduationCap,
+    cardImage: '/images/solutions/saas-products.webp',
     ...sectorMeta,
     features: [
       'Öğrenci portalı',
@@ -492,6 +501,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Hizmet şirketlerinde müşteri kaydı, iç talep ve onaylar sıkça e-posta ile yürür. Tasarlanabilecek çözümler; CRM, görev, doküman ve yönetim görünümünü aynı yetki modelinde toplamayı amaçlar.',
     Icon: Building2,
+    cardImage: '/images/solutions/admin-panel.webp',
     ...sectorMeta,
     features: [
       'CRM',
@@ -534,6 +544,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Satış ekiplerinde fırsat, teklif ve aktivite kaydı dağılınca tahmin ve takip zayıflar. Tasarlanabilecek CRM katmanı; lead, iletişim ve satış sonrası süreci aynı müşteri kartında tutmayı hedefler.',
     Icon: Workflow,
+    cardImage: '/images/solutions/crm-platform.webp',
     ...sectorMeta,
     features: [
       'Lead yönetimi',
@@ -577,6 +588,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Operasyonun Excel ve mesajlaşma ile yürümesi gecikmeyi gizler. Tasarlanabilecek sistemler; talebi atama, işlem, kontrol ve onaya bağlayarak sürenin ve sorumlunun görünmesini sağlar.',
     Icon: Activity,
+    cardImage: '/images/solutions/workflow-automation.webp',
     ...sectorMeta,
     features: [
       'İş akışı',
@@ -619,6 +631,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'İş ortakları fiyat, stok ve siparişi e-posta ile aldığında hata ve gecikme artar. Tasarlanabilecek B2B katmanı; firma, kullanıcı, yetki ve işlemi aynı portalda toplamayı hedefler.',
     Icon: Network,
+    cardImage: '/images/solutions/b2b-platform.webp',
     ...sectorMeta,
     features: [
       'Kurumsal kullanıcı yönetimi',
@@ -661,6 +674,7 @@ export const sectorSolutions: SolutionDetail[] = [
     description:
       'Hizmet işletmelerinde randevu, kaynak ve ödeme ayrı araçlarda kalınca çakışma artar. Tasarlanabilecek sistemler; müsaitlik, rezervasyon, iptal ve müşteri kaydını tek takvim omurgasında tutmayı hedefler.',
     Icon: CalendarCheck,
+    cardImage: '/images/solutions/booking-ticketing.webp',
     ...sectorMeta,
     features: [
       'Online rezervasyon',

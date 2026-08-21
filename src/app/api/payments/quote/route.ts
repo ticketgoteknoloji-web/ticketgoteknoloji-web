@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { quoteProduct, type PaymentPeriod } from '@/lib/commerce';
+import { quoteProduct, type PaymentPeriod } from '@/lib/commerce-server';
 import { clientIp, originAllowed, paymentLog, rateLimit } from '@/lib/payments/security';
 
 export const runtime = 'nodejs';

@@ -30,7 +30,7 @@ export function ProcessSection() {
 
   return (
     <section id="nasil-calisiyoruz" className="section-wrap section-y scroll-section">
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-600">Nasıl Çalışıyoruz?</p>
+      <p className="eyebrow mb-3">Nasıl Çalışıyoruz?</p>
       <h2 className="section-title">Fikirden Çalışan Dijital Ürüne</h2>
       <p className="section-subtitle">
         Her projeyi iş ihtiyacını anlamaktan sürdürülebilir teknoloji altyapısına kadar uçtan uca ele alıyoruz.

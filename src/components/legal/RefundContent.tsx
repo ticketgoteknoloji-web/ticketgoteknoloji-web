@@ -2,27 +2,29 @@ import { COMPANY, displayRegistry } from '@/config/company';
 import { CompanyInfoPanel } from '@/components/legal/CompanyInfoPanel';
 import { LEGAL_VERSIONS, formatLegalDate } from '@/lib/legal/versions';
 
-export function RefundContent() {
+export function RefundContent({ omitChrome = false }: { omitChrome?: boolean }) {
   const doc = LEGAL_VERSIONS.refund;
 
   return (
-    <div className="space-y-8 text-sm leading-7 text-ink">
+    <div className={omitChrome ? 'legal-content-modal space-y-8 text-sm leading-7 text-ink' : 'space-y-8 text-sm leading-7 text-ink'}>
+      {!omitChrome ? (
       <div className="border-b border-line pb-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">
-          {COMPANY.legalName}
-        </p>
-        <h2 className="mt-2 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
-          İptal, Cayma ve İade Koşulları
-        </h2>
-        <p className="mt-1 text-xs text-muted">
-          Sürüm {doc.version} · Son güncelleme: {formatLegalDate(doc.updatedAt)}
-        </p>
-        <p className="mt-3 text-sm leading-6 text-muted">
-          {COMPANY.legalName} üzerinden gerçekleştirilen satın alma işlemlerinde iptal, cayma ve iade
-          süreçleri; satın alınan ürün veya hizmetin niteliğine ve yürürlükteki tüketici mevzuatına göre
-          değerlendirilir.
-        </p>
-      </div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">
+                  {COMPANY.legalName}
+                </p>
+                <h2 className="mt-2 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+                  İptal, Cayma ve İade Koşulları
+                </h2>
+                <p className="mt-1 text-xs text-muted">
+                  Sürüm {doc.version} · Son güncelleme: {formatLegalDate(doc.updatedAt)}
+                </p>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  {COMPANY.legalName} üzerinden gerçekleştirilen satın alma işlemlerinde iptal, cayma ve iade
+                  süreçleri; satın alınan ürün veya hizmetin niteliğine ve yürürlükteki tüketici mevzuatına göre
+                  değerlendirilir.
+                </p>
+              </div>
+      ) : null}
 
       <section>
         <h3 className="text-base font-semibold text-ink">Satıcı / Hizmet Sağlayıcı</h3>

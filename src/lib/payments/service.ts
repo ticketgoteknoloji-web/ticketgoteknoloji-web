@@ -1,4 +1,5 @@
-import { quoteProduct, type PaymentPeriod } from '@/lib/commerce';
+import { quoteProduct, type PaymentPeriod } from '@/lib/commerce-server';
+import { grantDownloadEntitlement } from '@/lib/downloads/store';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 import { formatMinor } from '@/lib/money';
 import { publicBaseUrl, qnbpayConfig } from '@/lib/payments/config';
@@ -373,6 +374,17 @@ export async function finalizeFromCallback(
     status,
     providerReference: verified.providerPaymentId,
   });
+
+  if (status === 'paid' && next) {
+    await grantDownloadEntitlement({
+      orderId: next.id,
+      productId: next.productId,
+      paymentId: next.paymentTransactionId ?? next.providerPaymentId,
+      statusToken: next.statusToken,
+      customerEmail: next.customerEmail,
+    });
+  }
+
   return next;
 }
 

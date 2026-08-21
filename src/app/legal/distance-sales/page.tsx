@@ -29,6 +29,23 @@ export default async function DistanceSalesPage({ searchParams }: { searchParams
     <LegalDocument
       doc={doc}
       intro="İşbu Mesafeli Satış Sözleşmesi, TicketGo Teknoloji A.Ş. tarafından elektronik ortamda sunulan ve mesafeli olarak satın alınabilen ürün veya hizmetlere ilişkin tarafların hak ve yükümlülüklerini düzenlemek amacıyla hazırlanmıştır."
+      tableOfContents={[
+        { id: '1-taraflar', label: '1. Taraflar' },
+        { id: '2-sozlesmenin-konusu', label: '2. Sözleşmenin konusu' },
+        { id: '3-sozlesme-konusu-urun-veya-hizmet', label: '3. Sözleşme konusu ürün veya hizmet' },
+        { id: '4-siparis-ve-sozlesmenin-kurulmasi', label: '4. Sipariş ve sözleşmenin kurulması' },
+        { id: '5-odeme', label: '5. Ödeme' },
+        { id: '6-urun-veya-hizmetin-ifasi', label: '6. Ürün veya hizmetin ifası' },
+        { id: '7-cayma-hakki', label: '7. Cayma hakkı' },
+        { id: '8-cayma-bildirimi', label: '8. Cayma bildirimi' },
+        { id: '9-iade', label: '9. İade' },
+        { id: '10-cayma-hakkinin-istisnalari', label: '10. Cayma hakkının istisnaları' },
+        { id: '11-fikri-mulkiyet', label: '11. Fikri mülkiyet' },
+        { id: '12-kullanim-kosullari', label: '12. Kullanım koşulları' },
+        { id: '13-kisisel-veriler', label: '13. Kişisel veriler' },
+        { id: '14-uyusmazliklar', label: '14. Uyuşmazlıklar' },
+        { id: '15-yururluk', label: '15. Yürürlük' },
+      ]}
     >
       <LegalSection title="1. Taraflar">
         <CompanyInfoPanel title="SATICI BİLGİLERİ" />

@@ -1,4 +1,4 @@
-import { findCatalogItem, quoteProduct, type PaymentPeriod, type ProductQuote } from '@/lib/commerce';
+import { findCatalogItem, quoteProduct, type PaymentPeriod, type ProductQuote } from '@/lib/commerce-server';
 import { vatRateLabel } from '@/config/vat';
 import { formatMinor } from '@/lib/money';
 import { getOrderById } from '@/lib/payments/orders';

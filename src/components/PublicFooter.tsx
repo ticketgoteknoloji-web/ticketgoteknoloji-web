@@ -10,12 +10,12 @@ import {
   BRAND_WHATSAPP_NUMBER,
 } from '@/lib/site';
 import { createWhatsAppLink } from '@/lib/mailto';
-import { LegalTrigger } from '@/components/legal/LegalTrigger';
 import { BrandLogo } from './BrandLogo';
 
 const companyLinks = [
   { href: '/about', label: 'Hakkımızda' },
   { href: '/projects', label: 'Ürünler' },
+  { href: '/download', label: 'Download' },
   { href: '/pricing#hizmet', label: 'Hizmet' },
   { href: '/pricing#bakim', label: 'Bakım' },
   { href: '/pricing', label: 'Fiyatlandırma' },
@@ -26,7 +26,6 @@ const solutionLinks = [
   { href: '/solutions', label: 'Çözümler' },
   { href: '/#yapay-zeka', label: 'Yapay zekâ' },
   { href: '/#sektorler', label: 'Sektörler' },
-  { href: '/projects', label: 'Ticket-Go' },
 ] as const;
 
 const technologyLinks = [
@@ -35,13 +34,14 @@ const technologyLinks = [
   { href: '/#teknolojiler', label: 'Ekosistem' },
 ] as const;
 
-const legalTriggers = [
-  { doc: 'kvkk', label: 'KVKK' },
-  { doc: 'privacy', label: 'Gizlilik Politikası' },
-  { doc: 'cookies', label: 'Çerez Politikası' },
-  { doc: 'distance-sales', label: 'Mesafeli Satış' },
-  { doc: 'pre-information', label: 'Ön Bilgilendirme' },
-  { doc: 'refund', label: 'İptal / İade' },
+const legalLinks = [
+  { href: '/kvkk', label: 'KVKK' },
+  { href: '/privacy', label: 'Gizlilik Politikası' },
+  { href: '/terms', label: 'Kullanım Koşulları' },
+  { href: '/cookies', label: 'Çerez Politikası' },
+  { href: '/legal/distance-sales', label: 'Mesafeli Satış Sözleşmesi' },
+  { href: '/legal/pre-information', label: 'Ön Bilgilendirme' },
+  { href: '/legal/refund', label: 'İptal / İade Politikası' },
 ] as const;
 
 export function PublicFooter() {
@@ -49,13 +49,13 @@ export function PublicFooter() {
     <footer className="border-t border-line bg-surface">
       <div className="section-wrap grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-5">
         <div className="min-w-0">
-          <h4 className="text-sm font-semibold text-ink">Şirket</h4>
+          <h4 className="text-[0.8125rem] font-bold tracking-normal text-ink">Şirket</h4>
           <div className="mt-4 max-w-[150px]">
             <BrandLogo variant="footer" />
           </div>
-          <p className="mt-3 text-sm font-medium text-ink">{BRAND_LEGAL_NAME}</p>
-          <p className="mt-2 max-w-xs text-sm leading-6 text-muted">{BRAND_TAGLINE}</p>
-          <div className="mt-4 space-y-2 text-sm text-muted">
+          <p className="mt-3 text-sm font-semibold text-ink">{BRAND_LEGAL_NAME}</p>
+          <p className="mt-2 max-w-xs text-[0.9375rem] font-normal leading-[1.7] text-muted">{BRAND_TAGLINE}</p>
+          <div className="mt-4 space-y-2 text-sm font-medium text-muted">
             {companyLinks.map((item) => (
               <Link key={item.href} href={item.href} className="block transition-colors hover:text-brand-600">
                 {item.label}
@@ -64,8 +64,8 @@ export function PublicFooter() {
           </div>
         </div>
         <div className="min-w-0">
-          <h4 className="text-sm font-semibold text-ink">Çözümler</h4>
-          <div className="mt-4 space-y-2 text-sm text-muted">
+          <h4 className="text-[0.8125rem] font-bold tracking-normal text-ink">Çözümler</h4>
+          <div className="mt-4 space-y-2 text-sm font-medium text-muted">
             {solutionLinks.map((item) => (
               <Link key={`${item.href}-${item.label}`} href={item.href} className="block transition-colors hover:text-brand-600">
                 {item.label}
@@ -74,8 +74,8 @@ export function PublicFooter() {
           </div>
         </div>
         <div className="min-w-0">
-          <h4 className="text-sm font-semibold text-ink">Teknolojiler</h4>
-          <div className="mt-4 space-y-2 text-sm text-muted">
+          <h4 className="text-[0.8125rem] font-bold tracking-normal text-ink">Teknolojiler</h4>
+          <div className="mt-4 space-y-2 text-sm font-medium text-muted">
             {technologyLinks.map((item) => (
               <Link key={item.href} href={item.href} className="block transition-colors hover:text-brand-600">
                 {item.label}
@@ -84,8 +84,8 @@ export function PublicFooter() {
           </div>
         </div>
         <div className="min-w-0">
-          <h4 className="text-sm font-semibold text-ink">İletişim</h4>
-          <div className="mt-4 space-y-2 text-sm text-muted">
+          <h4 className="text-[0.8125rem] font-bold tracking-normal text-ink">İletişim</h4>
+          <div className="mt-4 space-y-2 text-sm font-medium text-muted">
             <a href={BRAND_PHONE_HREF} className="block transition-colors hover:text-brand-600">
               {BRAND_PHONE_DISPLAY}
             </a>
@@ -120,16 +120,12 @@ export function PublicFooter() {
           </div>
         </div>
         <div className="min-w-0">
-          <h4 className="text-sm font-semibold text-ink">Yasal</h4>
-          <div className="mt-4 space-y-2 text-sm text-muted">
-            {legalTriggers.map((item) => (
-              <LegalTrigger
-                key={item.doc}
-                doc={item.doc}
-                className="block w-full text-left text-sm text-muted transition-colors hover:text-brand-600"
-              >
+          <h4 className="text-[0.8125rem] font-bold tracking-normal text-ink">Yasal</h4>
+          <div className="mt-4 space-y-2 text-sm font-medium text-muted">
+            {legalLinks.map((item) => (
+              <Link key={item.href} href={item.href} className="block transition-colors hover:text-brand-600">
                 {item.label}
-              </LegalTrigger>
+              </Link>
             ))}
           </div>
         </div>

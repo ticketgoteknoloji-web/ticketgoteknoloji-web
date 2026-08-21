@@ -7,12 +7,14 @@ import { BuyButton } from '@/components/BuyButton';
 import { PaymentCheckout } from '@/components/payment/PaymentCheckout';
 import {
   checkoutPeriodFor,
-  findCatalogItem,
-  isPurchasable,
   paymentUrl,
-  quoteProduct,
   type PaymentPeriod,
 } from '@/lib/commerce';
+import {
+  findCatalogItem,
+  isPurchasable,
+  quoteProduct,
+} from '@/lib/commerce-server';
 import { getQnbCardPrograms, merchantInstallmentCounts } from '@/config/qnbpay-card-programs';
 import { getPaymentConfig, qnbpayConfig } from '@/lib/payments/config';
 import { getOrderById } from '@/lib/payments/orders';
@@ -200,7 +202,7 @@ function PaymentEntry({ message }: { message?: string }) {
         {groups.map((group) => (
           <section key={group.eyebrow} aria-labelledby={`group-${group.eyebrow}`}>
             <div className="mb-1 flex items-center gap-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-600">
+              <p className="eyebrow">
                 {group.eyebrow}
               </p>
               <div className="h-px flex-1 bg-line" />

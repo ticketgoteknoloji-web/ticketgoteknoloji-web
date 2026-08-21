@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
+import { CookiesContent, COOKIES_TOC } from '@/components/legal/CookiesContent';
+import { LegalPageShell } from '@/components/legal/LegalDocument';
 import { BRAND_SITE_URL } from '@/lib/site';
-import { CookiesContent } from '@/components/legal/CookiesContent';
 
 export const metadata: Metadata = {
   title: 'Çerez Politikası',
@@ -11,8 +12,15 @@ export const metadata: Metadata = {
 
 export default function CookiesPage() {
   return (
-    <main className="legal-document mx-auto w-full max-w-[920px] px-4 py-12 sm:px-6 sm:py-16">
-      <CookiesContent />
-    </main>
+    <LegalPageShell
+      title="Çerez Politikası"
+      eyebrow="Çerezler"
+      description="Kurumsal web sitesinde kullanılan sınırlı teknik çerezler hakkında bilgilendirme. Reklam veya üçüncü taraf izleme çerezleri kullanılmamaktadır."
+      lastUpdated="2026-08-19"
+      tableOfContents={[...COOKIES_TOC]}
+      showRegistryNotice={false}
+    >
+      <CookiesContent omitChrome />
+    </LegalPageShell>
   );
 }

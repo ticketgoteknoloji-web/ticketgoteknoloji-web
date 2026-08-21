@@ -98,7 +98,7 @@ export function SolutionDetailModal({ solution, open, onClose }: SolutionDetailM
             <Icon size={20} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-600">
+            <p className="eyebrow">
               {solution.category ?? 'Çözüm'}
             </p>
             <h3 id={titleId} className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">
@@ -289,11 +289,9 @@ export function SolutionDetailModal({ solution, open, onClose }: SolutionDetailM
               {solution.productExample.href ? (
                 <a
                   href={solution.productExample.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="mt-3 inline-flex text-sm font-semibold text-brand-700 underline"
                 >
-                  Ticket-Go’yu incele
+                  Detayları incele
                 </a>
               ) : null}
             </div>

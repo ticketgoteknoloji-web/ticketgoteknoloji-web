@@ -1,17 +1,10 @@
 import type { Metadata } from 'next';
-import { Cormorant_Garamond, DM_Sans } from 'next/font/google';
+import { DM_Sans } from 'next/font/google';
 import { AnimatedLineBackground } from '@/components/AnimatedLineBackground';
 import { AppChrome } from '@/components/AppChrome';
 import { FloatingWhatsApp } from '@/components/FloatingWhatsApp';
 import { BRAND_LEGAL_NAME, BRAND_SITE_URL } from '@/lib/site';
 import './globals.css';
-
-const displayFont = Cormorant_Garamond({
-  subsets: ['latin', 'latin-ext'],
-  weight: ['500', '600', '700'],
-  variable: '--font-display',
-  display: 'swap',
-});
 
 const sansFont = DM_Sans({
   subsets: ['latin', 'latin-ext'],
@@ -60,7 +53,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr" className={`${displayFont.variable} ${sansFont.variable}`}>
+    <html lang="tr" className={sansFont.variable}>
       <body className="font-sans antialiased">
         <AnimatedLineBackground />
         <AppChrome>{children}</AppChrome>

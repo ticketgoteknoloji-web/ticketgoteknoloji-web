@@ -142,7 +142,7 @@ export const featureCatalog: SolutionDetail[] = [
     description:
       'Web, mobil, CRM, ERP ve ödeme servislerini kontrollü API ve webhook yapılarıyla tek ekosistemde buluşturuyoruz.',
     Icon: GitMerge,
-    cardImage: '/images/solutions/api-integrations.webp',
+    cardImage: '/images/arch/arch-api-gateway.webp',
     hoverHints: ['REST API', 'Webhook', 'Sistem Entegrasyonu'],
     tags: ['API First', 'Security First', 'Scalable'],
     features: [
@@ -176,7 +176,7 @@ export const featureCatalog: SolutionDetail[] = [
     description:
       'AI asistanı, arama, doküman ve otomasyon senaryolarını mevcut iş sistemine bağlayan entegrasyon katmanları tasarlıyoruz. Hangi yeteneğin uygulanacağı veri, yetki ve iş ihtiyacına göre belirlenir.',
     Icon: Bot,
-    cardImage: '/images/solutions/ai-integrations.webp',
+    cardImage: '/images/arch/arch-ai-services.webp',
     hoverHints: ['AI Asistanları', 'Akıllı Arama', 'Otomasyon'],
     tags: ['AI Ready', 'API First'],
     features: [
@@ -208,7 +208,7 @@ export const featureCatalog: SolutionDetail[] = [
     description:
       'Uygulamayı geliştirme, test ve canlı ortamları ayrı tutacak; yayın, gözlem ve ölçek ihtiyacına açık bir altyapı kurgusuyla tasarlıyoruz.',
     Icon: Cloud,
-    cardImage: '/images/solutions/web-applications.webp',
+    cardImage: '/images/process/process-launch.webp',
     hoverHints: ['CI/CD', 'Monitoring', 'Scaling'],
     tags: ['Cloud Ready', 'Scalable'],
     features: [
@@ -240,6 +240,7 @@ export const featureCatalog: SolutionDetail[] = [
     description:
       'Güvenliği sonradan eklenen bir katman olarak değil; kimlik doğrulama, yetkilendirme, kayıt ve ortam ayrımıyla mimarinin parçası olarak ele alırız. Bu metin doğrulanmamış sertifika iddiası taşımaz.',
     Icon: ShieldCheck,
+    cardImage: '/images/process/process-qa.webp',
     hoverHints: ['Authentication', 'Yetki', 'Audit'],
     tags: ['Security First'],
     features: [
@@ -346,6 +347,7 @@ export const featureCatalog: SolutionDetail[] = [
     subtitle: 'Web arayüzlerini erişilebilir, hızlı ve yönetilebilir biçimde üretiriz.',
     description: 'React ve Next.js tabanlı arayüzlerle kurumsal panelleri ve müşteri yüzeylerini tasarlarız.',
     Icon: Globe,
+    cardImage: '/images/solutions/web-applications.webp',
     hoverHints: ['React', 'Next.js', 'Responsive'],
     tags: ['Modular'],
     features: ['React', 'Next.js', 'TypeScript', 'Tailwind CSS', 'Responsive UI', 'Erişilebilirlik'],
@@ -363,6 +365,7 @@ export const featureCatalog: SolutionDetail[] = [
     subtitle: 'İş kurallarını, yetkiyi ve entegrasyonu sunan servis omurgası.',
     description: 'Node.js ve REST tabanlı servislerle kimlik, iş kuralı ve arka plan işlerini yönetiriz.',
     Icon: ServerCog,
+    cardImage: '/images/arch/arch-application.webp',
     hoverHints: ['Node.js', 'REST API', 'Yetki'],
     tags: ['API First', 'Security First'],
     features: ['Node.js', 'REST API', 'Authentication', 'Authorization', 'Background jobs', 'Notification services'],
@@ -379,6 +382,7 @@ export const featureCatalog: SolutionDetail[] = [
     subtitle: 'Kayıt modelini raporlanabilir hale getiren veri katmanı.',
     description: 'SQL/NoSQL, önbellek ve raporlama ile operasyon verisini karar çıktısına dönüştürürüz.',
     Icon: Database,
+    cardImage: '/images/arch/arch-data-analytics.webp',
     hoverHints: ['SQL / NoSQL', 'Dashboard', 'Caching'],
     tags: ['Data Driven'],
     features: ['Veri modelleme', 'SQL / NoSQL', 'Caching', 'Raporlama', 'Dashboard altyapıları', 'Export'],
@@ -395,6 +399,7 @@ export const featureCatalog: SolutionDetail[] = [
     subtitle: 'Yayın, ortam ve gözlemi tekrarlanabilir hale getiren operasyon pratiği.',
     description: 'CI/CD, ortam ayrımı ve loglama ile ürünün kontrollü yayınlanmasını hedefleriz.',
     Icon: ServerCog,
+    cardImage: '/images/process/process-launch.webp',
     hoverHints: ['CI/CD', 'Ortam', 'Log'],
     tags: ['Cloud Ready'],
     features: ['CI/CD', 'Ortam ayrımı', 'Yayın otomasyonu', 'Logging', 'Monitoring'],
@@ -410,6 +415,7 @@ export const featureCatalog: SolutionDetail[] = [
     subtitle: 'Ürünü birbirini kilitlemeyen katmanlarda kurarız.',
     description: 'Modüler mimari; CRM, operasyon, rapor ve entegrasyonun bağımsız büyüyebilmesini sağlar.',
     Icon: Layers,
+    cardImage: '/images/process/process-architecture.webp',
     hoverHints: ['Katmanlar', 'Bağımsız büyüme'],
     tags: ['Modular', 'Scalable'],
     features: ['Ayrık modüller', 'Ortak API', 'Kontrollü bağımlılık', 'Ölçeklenebilir omurga'],
@@ -425,6 +431,7 @@ export const featureCatalog: SolutionDetail[] = [
     subtitle: 'Web, mobil ve harici sistem aynı servis katmanından konuşur.',
     description: 'API-first yaklaşım, ekranı tek kaynak olmaktan çıkarır; ürün birden fazla kanala açılabilir.',
     Icon: GitMerge,
+    cardImage: '/images/arch/arch-external-integrations.webp',
     hoverHints: ['REST', 'Kanal bağımsızlığı'],
     tags: ['API First'],
     features: ['Ortak servis katmanı', 'Webhook', 'Dokümantasyon', 'Yetkili erişim'],
@@ -440,6 +447,7 @@ export const featureCatalog: SolutionDetail[] = [
     subtitle: 'Kararın tahmine kalmaması için raporu ürünün parçası yaparız.',
     description: 'Veri odaklı ürün; operasyon kaydını KPI ve trende dönüştürülebilir hale getirir.',
     Icon: Database,
+    cardImage: '/images/arch/arch-data-analytics.webp',
     hoverHints: ['KPI', 'Rapor'],
     tags: ['Data Driven'],
     features: ['Metrik tanımı', 'Dashboard', 'Filtre', 'Export'],

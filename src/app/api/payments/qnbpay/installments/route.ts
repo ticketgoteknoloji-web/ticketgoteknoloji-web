@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { quoteProduct, type PaymentPeriod } from '@/lib/commerce';
+import { quoteProduct, type PaymentPeriod } from '@/lib/commerce-server';
 import { fromMinorUnits } from '@/lib/money';
 import { getEnabledQnbCardPrograms } from '@/config/qnbpay-card-programs';
 import { originAllowed, rateLimit, clientIp, paymentLog } from '@/lib/payments/security';

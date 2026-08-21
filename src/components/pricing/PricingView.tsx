@@ -84,7 +84,7 @@ function OfferingSection({
 }) {
   return (
     <section id={id} className="section-wrap section-y scroll-section" aria-labelledby={`${id}-title`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-600">{eyebrow}</p>
+      <p className="eyebrow">{eyebrow}</p>
       <h2 id={`${id}-title`} className="mt-2 text-[2.25rem] font-semibold tracking-tight text-ink sm:text-[2.5rem]">
         {title}
       </h2>
@@ -110,11 +110,11 @@ export function PricingView() {
   return (
     <div>
       <section className="section-wrap section-y">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-600">Fiyatlandırma</p>
+        <p className="eyebrow">Fiyatlandırma</p>
         <h1 className="section-title mt-3">Ürün, hizmet ve bakım fiyatları</h1>
         <p className="section-subtitle">
-          Ticket-Go benzeri rezervasyon platformları, özel yazılım, AI entegrasyonu ve bakım işleri ayrı fiyat modelleriyle
-          sunulur. Sabit fiyatlı paketler ödeme sayfasına, özel kapsamlı işler teklif formuna gider.
+          Kurumsal yazılım platformları, özel yazılım, AI entegrasyonu ve bakım işleri ayrı fiyat modelleriyle sunulur.
+          Sabit fiyatlı paketler ödeme sayfasına, özel kapsamlı işler teklif formuna gider.
         </p>
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <BillingToggle period={period} onChange={setPeriod} />
@@ -126,19 +126,19 @@ export function PricingView() {
       <OfferingSection
         id="urun"
         eyebrow="Ürün"
-        title="Ticket-Go platformu"
-        subtitle="Canlı ürün örneği Ticket-Go’dur. Aşağıdaki rakamlar self-servis abonelik değil; kurulumlu platform kullanımı için başlangıç fiyatlarıdır. Kapsam keşiften sonra netleşir."
+        title="Dijital platform paketleri"
+        subtitle="Aşağıdaki rakamlar self-servis abonelik değil; kurulumlu platform kullanımı için başlangıç fiyatlarıdır. Kapsam keşiften sonra netleşir."
       >
         <OfferingGrid items={pricingCatalog.plans} variant="product" period={period} />
       </OfferingSection>
 
       <section className="section-wrap pb-12 sm:pb-16" aria-labelledby="plan-compare">
         <h2 id="plan-compare" className="text-[1.375rem] font-semibold tracking-tight text-ink sm:text-2xl">
-          Ticket-Go paket karşılaştırması
+          Platform paket karşılaştırması
         </h2>
         <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
           <table className="min-w-[720px] w-full border-collapse text-left text-sm">
-            <caption className="sr-only">Ticket-Go paket özellik karşılaştırması</caption>
+            <caption className="sr-only">Platform paket özellik karşılaştırması</caption>
             <thead>
               <tr className="border-b border-line bg-canvas">
                 <th scope="col" className="px-4 py-3 font-semibold text-ink">
@@ -238,7 +238,7 @@ export function PricingView() {
       </OfferingSection>
 
       <section id="ekler" className="section-wrap section-y scroll-section" aria-labelledby="addons">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-600">Hizmet</p>
+        <p className="eyebrow">Hizmet</p>
         <h2 id="addons" className="mt-2 text-[2.25rem] font-semibold tracking-tight text-ink sm:text-[2.5rem]">
           Add-on ve aşım ücretleri
         </h2>

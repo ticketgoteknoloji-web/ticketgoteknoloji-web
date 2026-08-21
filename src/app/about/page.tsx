@@ -204,7 +204,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── GELİŞTİRDİĞİMİZ PLATFORMLAR: Ticket-Go ───────────────── */}
+      {/* ── Geliştirdiğimiz platform yaklaşımı ───────────────── */}
       <section className="section-wrap pb-16 lg:pb-20">
         <h2 className="section-title">Geliştirdiğimiz Platformlar</h2>
         <p className="section-subtitle">

@@ -49,7 +49,7 @@ export default function TechnologiesPage() {
       </section>
 
       <section className="section-wrap pb-8">
-        <TicketGoProduct heading="Ticket-Go: gerçek dünya ürün örneği" compact />
+        <TicketGoProduct heading="Ürüne dönüşen teknoloji yaklaşımı" compact />
       </section>
       <CorporateCta href="/contact" />
     </main>

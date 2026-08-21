@@ -9,12 +9,13 @@ import { acquireScrollLock } from '@/lib/scroll-lock';
 import { BrandLogo } from './BrandLogo';
 
 const navItems = [
-  { href: '/#ana-sayfa', label: 'Ana Sayfa', sectionId: 'ana-sayfa' },
-  { href: '/#cozumler', label: 'Çözümler', sectionId: 'cozumler' },
-  { href: '/#teknolojiler', label: 'Teknolojiler', sectionId: 'teknolojiler' },
-  { href: '/#urunler', label: 'Ürünler', sectionId: 'urunler' },
-  { href: '/payment', label: 'Ödeme' },
-  { href: '/#iletisim', label: 'İletişim', sectionId: 'iletisim', opensContactModal: true },
+  { href: '/#ana-sayfa', label: 'Ana Sayfa', sectionId: 'ana-sayfa', tone: 'sky' },
+  { href: '/#cozumler', label: 'Çözümler', sectionId: 'cozumler', tone: 'teal' },
+  { href: '/#teknolojiler', label: 'Teknolojiler', sectionId: 'teknolojiler', tone: 'indigo' },
+  { href: '/#urunler', label: 'Ürünler', sectionId: 'urunler', tone: 'amber' },
+  { href: '/payment', label: 'Ödeme', tone: 'emerald' },
+  { href: '/download', label: 'Download', tone: 'slate' },
+  { href: '/#iletisim', label: 'İletişim', sectionId: 'iletisim', opensContactModal: true, tone: 'rose' },
 ] as const;
 
 export function Navbar() {
@@ -89,15 +90,14 @@ export function Navbar() {
     (href === '/#teknolojiler' && pathname.startsWith('/technologies')) ||
     (href === '/#urunler' && pathname.startsWith('/projects')) ||
     (href === '/payment' && pathname.startsWith('/payment')) ||
+    (href === '/download' && pathname.startsWith('/download')) ||
     (href === '/#iletisim' && contactOpen);
 
   const renderNavItem = (item: (typeof navItems)[number], mobile = false) => {
     const active = isActive(item.href);
     const className = mobile
-      ? 'nav-pill rounded-lg px-3 py-2.5 text-sm font-medium text-ink'
-      : `nav-pill whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-medium leading-none ${
-          active ? 'text-brand-600' : 'text-ink'
-        }`;
+      ? 'nav-pill rounded-lg border border-transparent px-3.5 py-2.5 text-[1rem] font-semibold text-ink'
+      : 'nav-pill whitespace-nowrap rounded-lg border border-transparent px-3 py-2.5 text-[0.9375rem] font-semibold leading-none tracking-normal text-ink xl:px-3.5';
 
     if ('opensContactModal' in item && item.opensContactModal) {
       return (
@@ -105,6 +105,7 @@ export function Navbar() {
           key={item.label}
           type="button"
           data-active={active}
+          data-tone={item.tone}
           aria-haspopup="dialog"
           aria-expanded={contactOpen}
           className={className}
@@ -123,6 +124,7 @@ export function Navbar() {
         key={item.href}
         href={item.href}
         data-active={active}
+        data-tone={item.tone}
         className={className}
         onClick={() => {
           if (mobile) setOpen(false);

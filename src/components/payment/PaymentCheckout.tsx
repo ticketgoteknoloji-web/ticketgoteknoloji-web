@@ -82,10 +82,10 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
   const canPay = Boolean(customerValid && cardOk && legalAccepted && orderOk && !submitting);
 
   const errors = {
-    holder: !holderOk ? 'Kart ?zerindeki ad soyad alan?n? doldurun.' : null,
-    pan: !panOk ? 'Kart numaras?n? kontrol edin.' : null,
-    expiry: !expiryOk ? 'Son kullanma tarihi ge?ersiz.' : null,
-    cvv: !cvvOk ? 'G?venlik kodunu kontrol edin.' : null,
+    holder: !holderOk ? 'Kart üzerindeki ad soyad alanını doldurun.' : null,
+    pan: !panOk ? 'Kart numarasını kontrol edin.' : null,
+    expiry: !expiryOk ? 'Son kullanma tarihi geçersiz.' : null,
+    cvv: !cvvOk ? 'Güvenlik kodunu kontrol edin.' : null,
   };
 
   const legalQuery = useMemo(() => {
@@ -106,7 +106,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
     setAttempted(true);
     if (!customerValid || !cardOk || !legalAccepted || !orderOk) {
       setMessageTone('error');
-      setMessage('Kart bilgilerini, fatura bilgilerini ve s?zle?meyi kontrol edin.');
+      setMessage('Kart bilgilerini, fatura bilgilerini ve sözleşmeyi kontrol edin.');
       return;
     }
     setMessage(null);
@@ -168,13 +168,13 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       setMessageTone(data.configured === false ? 'info' : 'error');
       setMessage(
         data.configured === false
-          ? 'QNBpay Sanal POS ba?lant?s? hen?z yap?land?r?lmad?. Test i?in ?ye i?yeri bilgilerini .env.local dosyas?na ekleyin.'
-          : data.message || data.error || 'QNBpay ile ?deme ba?lat?lamad?.'
+          ? 'QNBpay Sanal POS bağlantısı henüz yapılandırılmadı. Test için üye işyeri bilgilerini .env.local dosyasına ekleyin.'
+          : data.message || data.error || 'QNBpay ile ödeme başlatılamadı.'
       );
       setSubmitting(false);
     } catch {
       setMessageTone('error');
-      setMessage('Bir hata olu?tu. L?tfen tekrar deneyin.');
+      setMessage('Bir hata oluştu. Lütfen tekrar deneyin.');
       setSubmitting(false);
     }
   }
@@ -198,13 +198,13 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       </div>
 
       <div className="max-w-3xl">
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">G?venli ?deme</h1>
+        <h1 className="font-sans text-2xl font-bold tracking-[-0.03em] text-ink sm:text-3xl">Güvenli Ödeme</h1>
         <p className="mt-2 text-sm leading-6 text-muted">
-          Sipari?inizi tamamlamak i?in kart ve fatura bilgilerinizi girin. ?deme QNBpay g?venli altyap?s? ?zerinden
-          y?r?t?l?r.
+          Siparişinizi tamamlamak için kart ve fatura bilgilerinizi girin. Ödeme QNBpay güvenli altyapısı üzerinden
+          yürütülür.
         </p>
         <Link href="/" className="mt-3 inline-block text-sm font-medium text-brand-600 hover:underline">
-          Ana sayfaya d?n
+          Ana sayfaya dön
         </Link>
       </div>
 
@@ -216,7 +216,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       >
         <aside className="min-w-0 lg:sticky lg:top-28 lg:self-start">
           <section className="site-card min-w-0 overflow-hidden">
-            {/* ?r?n g?rseli */}
+            {/* Ürün görseli */}
             {(() => {
               const img = getProductImage(quote.productId);
               return (
@@ -234,11 +234,11 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
               );
             })()}
             <div className="p-5 sm:p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-600">Sipari? ?zeti</p>
+            <p className="eyebrow">Sipariş özeti</p>
             <h2 className="mt-2 text-lg font-semibold leading-snug text-ink">{quote.productName}</h2>
             <p className="mt-1 text-sm text-muted">{quote.description}</p>
             <p className="mt-3 inline-flex rounded-full border border-line bg-canvas px-2.5 py-0.5 text-[11px] font-medium text-muted">
-              {quote.periodLabel} ? {quote.quantity} adet ? KDV hari? fiyat
+              {quote.periodLabel} · {quote.quantity} adet · KDV hariç fiyat
             </p>
 
             <dl className="payment-summary mt-5">
@@ -252,7 +252,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                 : null}
               <hr className="payment-summary-divider" />
               <div className="payment-summary-row">
-                <dt>KDV Hari?</dt>
+                <dt>KDV Hariç</dt>
                 <dd>{subtotalLabel}</dd>
               </div>
               <div className="payment-summary-row">
@@ -265,7 +265,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
               </div>
             </dl>
             <p className="mt-4 text-xs leading-5 text-muted">
-              Tahsil edilecek tutar KDV dahil toplam bedeldir. Fiyatlar katalogdan sunucu taraf?nda hesaplan?r.
+              Tahsil edilecek tutar KDV dahil toplam bedeldir. Fiyatlar katalogdan sunucu tarafında hesaplanır.
             </p>
             </div>
           </section>
@@ -274,7 +274,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
         <div className="grid min-w-0 gap-6">
           <section className="site-card min-w-0 p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-ink">Kart bilgileri</h2>
-            <p className="mt-1 text-sm text-muted">3D Secure ile g?venli ?deme. Kart verileri saklanmaz.</p>
+            <p className="mt-1 text-sm text-muted">3D Secure ile güvenli ödeme. Kart verileri saklanmaz.</p>
 
             <div className="mt-5 max-w-sm">
               <div className="pay-card-face">
@@ -294,7 +294,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
 
             <div className="mt-5 space-y-4">
             <label className="block text-sm">
-              <span className="font-medium text-ink">Kart ?zerindeki Ad Soyad</span>
+              <span className="font-medium text-ink">Kart Üzerindeki Ad Soyad</span>
               <input
                 id="card-holder"
                 autoComplete="cc-name"
@@ -313,7 +313,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             </label>
 
             <label className="block text-sm">
-              <span className="font-medium text-ink">Kart Numaras?</span>
+              <span className="font-medium text-ink">Kart Numarası</span>
               <span className="relative mt-1 block">
                 <input
                   id="card-number"
@@ -367,7 +367,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                 ) : null}
               </label>
               <label className="block text-sm">
-                <span className="font-medium text-ink">G?venlik Kodu</span>
+                <span className="font-medium text-ink">Güvenlik Kodu</span>
                 <input
                   id="card-cvv"
                   type="password"
@@ -381,7 +381,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                   className="field-input mt-1 tracking-[0.35em]"
                 />
                 <span id="card-cvv-help" className="mt-1 block text-xs leading-5 text-muted">
-                  Kart?n?z?n arka y?z?ndeki 3 haneli g?venlik kodu.
+                  Kartınızın arka yüzündeki 3 haneli güvenlik kodu.
                 </span>
                 {attempted && errors.cvv ? (
                   <span id="card-cvv-error" role="alert" className="mt-1 block text-xs text-danger">
@@ -443,7 +443,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
               <input required name="address" autoComplete="street-address" value={address} onChange={(e) => setAddress(e.target.value)} className="field-input mt-1" />
             </label>
             <label className="text-sm sm:col-span-2">
-              <span className="font-medium text-ink">?ehir</span>
+              <span className="font-medium text-ink">Şehir</span>
               <input required name="city" autoComplete="address-level2" value={city} onChange={(e) => setCity(e.target.value)} className="field-input mt-1" />
             </label>
           </div>
@@ -476,32 +476,32 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
               <input type="checkbox" className="mt-0.5" checked={legalAccepted} onChange={(event) => setLegalAccepted(event.target.checked)} required />
               <span>
                 <LegalTrigger doc="distance-sales" className="font-semibold text-brand-600 hover:underline">
-                  Mesafeli Sat?? Sözle?mesi
+                  Mesafeli Satış Sözleşmesi
                 </LegalTrigger>
                 &apos;ni ve{' '}
                 <LegalTrigger doc="pre-information" className="font-semibold text-brand-600 hover:underline">
                   Ön Bilgilendirme Formu
                 </LegalTrigger>
-                &apos;nu okudum; sipari?e ve ödeme yükümlülüklerine ili?kin ko?ullar? kabul ediyorum.
+                &apos;nu okudum; siparişe ve ödeme yükümlülüklerine ilişkin koşulları kabul ediyorum.
               </span>
             </label>
             <p>
               <LegalTrigger doc="kvkk" className="font-semibold text-brand-600 hover:underline">
-                KVKK Ayd?nlatma Metni
+                KVKK Aydınlatma Metni
               </LegalTrigger>
-              {' ? '}
+              {' · '}
               <LegalTrigger doc="privacy" className="font-semibold text-brand-600 hover:underline">
-                Gizlilik Politikas?
+                Gizlilik Politikası
               </LegalTrigger>
-              {' ? '}
+              {' · '}
               <LegalTrigger doc="refund" className="font-semibold text-brand-600 hover:underline">
-                ?ptal / ?ade Ko?ullar?
+                İptal / İade Koşulları
               </LegalTrigger>
             </p>
-            <p>Ki?isel verilerinizin i?lenmesine ili?kin detaylar KVKK Ayd?nlatma Metni&apos;nde okuyabilirsiniz.</p>
+            <p>Kişisel verilerinizin işlenmesine ilişkin detayları KVKK Aydınlatma Metni&apos;nde okuyabilirsiniz.</p>
             <label className="flex items-start gap-3">
               <input type="checkbox" className="mt-0.5" checked={marketingOptIn} onChange={(event) => setMarketingOptIn(event.target.checked)} />
-              <span>Kampanya ve duyurular hakk?nda elektronik ileti almak istiyorum. (?ste?e ba?l?.)</span>
+              <span>Kampanya ve duyurular hakkında elektronik ileti almak istiyorum. (İsteğe bağlı.)</span>
             </label>
           </div>
 
@@ -512,20 +512,20 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             <strong>{totalLabel}</strong>
           </div>
           {!configured ? (
-            <p className="mt-2 text-xs text-warning">QNBpay Sanal POS ba?lant?s? henüz yap?land?r?lmad?.</p>
+            <p className="mt-2 text-xs text-warning">QNBpay Sanal POS bağlantısı henüz yapılandırılmadı.</p>
           ) : null}
           <button type="submit" disabled={!canPay} aria-disabled={!canPay} className="btn btn-primary mt-4 w-full">
-            {submitting ? 'Ödeme i?lemi ba?lat?l?yor...' : 'Güvenli Ödeme Yap'}
+            {submitting ? 'Ödeme işlemi başlatılıyor...' : 'Güvenli Ödeme Yap'}
           </button>
-          <p className="mt-2 text-center text-xs text-muted">QNBpay ile 3D Secure</p>
+          <p className="mt-2 text-center text-xs text-muted">QNBpay · 3D Secure</p>
           <p className="mt-3 text-xs leading-5 text-muted">
-            Ödeme konusunda destek al?n:{' '}
+            Ödeme konusunda destek alın:{' '}
             <a
               className="email-link font-semibold text-brand-600"
               href={createMailto({
                 to: BRAND_SUPPORT_EMAIL,
-                subject: 'TicketGo Teknoloji | Ödeme Deste?i',
-                body: 'Merhaba TicketGo Teknoloji Ekibi,\n\nÖdeme konusunda yard?m almak istiyorum.\n\nTalebim:\n',
+                subject: 'TicketGo Teknoloji | Ödeme Desteği',
+                body: 'Merhaba TicketGo Teknoloji Ekibi,\n\nÖdeme konusunda yardım almak istiyorum.\n\nTalebim:\n',
               })}
             >
               {BRAND_SUPPORT_EMAIL}
@@ -533,7 +533,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             {(() => {
               const waHref = createWhatsAppLink({
                 phone: BRAND_WHATSAPP_NUMBER,
-                message: 'Merhaba TicketGo Teknoloji, ödeme i?lemi konusunda destek almak istiyorum.',
+                message: 'Merhaba TicketGo Teknoloji, ödeme işlemi konusunda destek almak istiyorum.',
               });
               return waHref ? (
                 <>

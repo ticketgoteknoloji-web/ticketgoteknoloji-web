@@ -8,7 +8,13 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/payment', '/payment/', '/api/'],
+      disallow: [
+        '/payment',
+        '/payment/',
+        '/api/',
+        '/api/downloads/',
+        '/api/payments/',
+      ],
     },
     sitemap: `${BRAND_SITE_URL}/sitemap.xml`,
     host: BRAND_SITE_URL,

@@ -8,27 +8,29 @@ import { LEGAL_VERSIONS, formatLegalDate } from '@/lib/legal/versions';
  * The full /legal/distance-sales page supports dynamic order params;
  * this modal variant shows the general template without order-specific data.
  */
-export function DistanceSalesContent() {
+export function DistanceSalesContent({ omitChrome = false }: { omitChrome?: boolean }) {
   const doc = LEGAL_VERSIONS.distanceSales;
 
   return (
-    <div className="space-y-8 text-sm leading-7 text-ink">
+    <div className={omitChrome ? 'legal-content-modal space-y-8 text-sm leading-7 text-ink' : 'space-y-8 text-sm leading-7 text-ink'}>
+      {!omitChrome ? (
       <div className="border-b border-line pb-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">
-          {COMPANY.legalName}
-        </p>
-        <h2 className="mt-2 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
-          Mesafeli Satış Sözleşmesi
-        </h2>
-        <p className="mt-1 text-xs text-muted">
-          Sürüm {doc.version} · Son güncelleme: {formatLegalDate(doc.updatedAt)}
-        </p>
-        <p className="mt-3 text-sm leading-6 text-muted">
-          İşbu Mesafeli Satış Sözleşmesi, {COMPANY.legalName} tarafından elektronik ortamda sunulan ve
-          mesafeli olarak satın alınabilen ürün veya hizmetlere ilişkin tarafların hak ve yükümlülüklerini
-          düzenlemek amacıyla hazırlanmıştır.
-        </p>
-      </div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">
+                  {COMPANY.legalName}
+                </p>
+                <h2 className="mt-2 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+                  Mesafeli Satış Sözleşmesi
+                </h2>
+                <p className="mt-1 text-xs text-muted">
+                  Sürüm {doc.version} · Son güncelleme: {formatLegalDate(doc.updatedAt)}
+                </p>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  İşbu Mesafeli Satış Sözleşmesi, {COMPANY.legalName} tarafından elektronik ortamda sunulan ve
+                  mesafeli olarak satın alınabilen ürün veya hizmetlere ilişkin tarafların hak ve yükümlülüklerini
+                  düzenlemek amacıyla hazırlanmıştır.
+                </p>
+              </div>
+      ) : null}
 
       <section>
         <h3 className="text-base font-semibold text-ink">1. Taraflar</h3>

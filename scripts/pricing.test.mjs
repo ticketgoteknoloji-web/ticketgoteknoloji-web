@@ -24,8 +24,8 @@ function annualSavingsAmount(monthlyPrice, discount) {
 const catalogPath = join(dirname(fileURLToPath(import.meta.url)), '../docs/pricing-catalog.json');
 const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
 
-test('catalog uses TRY and VAT notice', () => {
-  assert.equal(catalog.currency, 'TRY');
+test('catalog uses USD and VAT notice', () => {
+  assert.equal(catalog.currency, 'USD');
   assert.equal(catalog.taxNotice, 'Prices exclude VAT. 20% VAT is added at checkout.');
   assert.ok(catalog.taxNoticeTr.includes('KDV hariç'));
   assert.ok(catalog.taxNoticeTr.includes('%20'));

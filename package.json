@@ -8,13 +8,14 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
-    "test": "node --test scripts/pricing.test.mjs scripts/payments.test.mjs scripts/legal.test.mjs"
+    "test": "node --test scripts/pricing.test.mjs scripts/payments.test.mjs scripts/legal.test.mjs scripts/downloads.test.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.31.0",
-    "next": "^15.2.3",
+    "next": "15.5.23",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",

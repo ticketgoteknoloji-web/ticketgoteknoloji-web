@@ -106,7 +106,7 @@ export const platformSolutions: SolutionDetail[] = [
     title: 'Rezervasyon ve Biletleme Sistemleri',
     subtitle: 'Rezervasyondan ödemeye, biletten operasyona kadar uçtan uca dijital altyapı.',
     description:
-      'Rezervasyon ve biletleme çözümleri; kapasite, satış, ödeme ve operasyon adımlarını tek ürün akışında birleştirir. Ticket-Go gibi uçtan uca dijital platform deneyimi, bu alandaki ürün geliştirme yaklaşımımızın somut bir örneğidir. Gerçek müşteri veya satış rakamı iddiası taşımadan, rezervasyon operasyonunu dijitalleştirmeye odaklanır.',
+      'Rezervasyon ve biletleme çözümleri; kapasite, satış, ödeme ve operasyon adımlarını tek ürün akışında birleştirir. Uçtan uca dijital platform deneyimi, bu alandaki ürün geliştirme yaklaşımımızın somut bir örneğidir. Gerçek müşteri veya satış rakamı iddiası taşımadan, rezervasyon operasyonunu dijitalleştirmeye odaklanır.',
     Icon: Ticket,
     features: [
       'Online rezervasyon',

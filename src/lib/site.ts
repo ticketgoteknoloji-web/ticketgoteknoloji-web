@@ -6,13 +6,11 @@ export const BRAND_TAGLINE =
   'Kurumsal yazılım, CRM, SaaS, dijital platform, web ve mobil uygulama, API, otomasyon ve yapay zekâ entegrasyonları geliştiriyoruz.';
 
 export const BRAND_INFO_EMAIL = 'info@ticketgoteknoloji.com';
-export const BRAND_ADMIN_EMAIL = 'admin@ticketgoteknoloji.com';
 export const BRAND_SUPPORT_EMAIL = 'destek@ticketgoteknoloji.com';
 export const BRAND_KVKK_EMAIL = 'kvkk@ticketgoteknoloji.com';
 
 export const BRAND_CONTACT_CHANNELS = [
   { label: 'Genel İletişim', email: BRAND_INFO_EMAIL },
-  { label: 'Yönetim', email: BRAND_ADMIN_EMAIL },
   { label: 'Teknik Destek', email: BRAND_SUPPORT_EMAIL },
   { label: 'KVKK Başvuruları', email: BRAND_KVKK_EMAIL },
 ] as const;
@@ -35,7 +33,7 @@ export const BRAND_MERSIS = '0843093110800001';
 
 export const BRAND_HOURS = ['Pazartesi–Cuma, 09:00–18:00', 'Cumartesi, 09:00–12:00'] as const;
 
-export const PRODUCT_TICKET_GO = 'Ticket-Go';
-export const PRODUCT_TICKET_GO_URL = 'https://www.ticket-go.net';
+/** Corporate platform capability label — not an external ferry product brand. */
+export const PRODUCT_PLATFORM_LABEL = 'Dijital Platform';
 
 export const CONTACT_ENDPOINT = '/api/contact';

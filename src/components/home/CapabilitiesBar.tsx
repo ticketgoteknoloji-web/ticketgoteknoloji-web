@@ -3,11 +3,6 @@
 import { FeatureCardGrid } from '@/components/FeatureCardGrid';
 import { featuresByIds, overlayFeature } from '@/data/featureCatalog';
 
-const spans: Record<string, string> = {
-  software: 'md:col-span-2 md:row-span-2',
-  ai: 'md:col-span-2',
-};
-
 const items = featuresByIds(['software', 'ai', 'crm', 'api', 'analytics', 'cloud']).map((item) => {
   if (item.id === 'crm') return overlayFeature('crm', { title: 'CRM' }) ?? item;
   if (item.id === 'api') return overlayFeature('api', { title: 'API' }) ?? item;
@@ -25,8 +20,8 @@ export function CapabilitiesBar() {
         </p>
         <FeatureCardGrid
           items={items}
-          className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
-          getClassName={(item) => spans[item.id] ?? ''}
+          hideSubtitle
+          className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-4"
         />
       </div>
     </section>

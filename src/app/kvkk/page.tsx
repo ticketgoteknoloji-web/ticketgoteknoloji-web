@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
-import { KvkkContent } from '@/components/legal/KvkkContent';
+import { KvkkContent, KVKK_TOC } from '@/components/legal/KvkkContent';
+import { LegalPageShell } from '@/components/legal/LegalDocument';
+import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 import { BRAND_SITE_URL } from '@/lib/site';
+
+const doc = LEGAL_VERSIONS.kvkk;
 
 export const metadata: Metadata = {
   title: 'KVKK Aydınlatma Metni',
@@ -11,8 +15,15 @@ export const metadata: Metadata = {
 
 export default function KvkkPage() {
   return (
-    <main className="mx-auto w-full max-w-[920px] px-4 py-12 sm:px-6 sm:py-16">
-      <KvkkContent />
-    </main>
+    <LegalPageShell
+      title={doc.title}
+      eyebrow="KVKK"
+      description="6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında veri sorumlusu sıfatıyla TicketGo Teknoloji A.Ş. tarafından kişisel verilerinizin işlenmesine ilişkin aydınlatma metni."
+      version={doc.version}
+      lastUpdated={doc.updatedAt}
+      tableOfContents={[...KVKK_TOC]}
+    >
+      <KvkkContent omitChrome />
+    </LegalPageShell>
   );
 }

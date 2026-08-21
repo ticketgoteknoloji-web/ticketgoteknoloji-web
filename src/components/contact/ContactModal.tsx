@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Briefcase,
   Building2,
   Headphones,
   Mail,
@@ -26,7 +25,6 @@ type ContactModalProps = {
 
 const contactChannels = [
   { label: 'Genel İletişim', email: COMPANY.emails.info, Icon: Mail },
-  { label: 'Yönetim', email: COMPANY.emails.admin, Icon: Briefcase },
   { label: 'Teknik Destek', email: COMPANY.emails.support, Icon: Headphones },
   { label: 'KVKK', email: COMPANY.emails.kvkk, Icon: ShieldCheck },
 ] as const;

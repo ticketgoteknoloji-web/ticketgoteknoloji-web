@@ -1,8 +1,7 @@
 import {
   BRAND_ADDRESS,
-  BRAND_ADMIN_EMAIL,
-  BRAND_DOMAIN,
   BRAND_INFO_EMAIL,
+  BRAND_DOMAIN,
   BRAND_KVKK_EMAIL,
   BRAND_LEGAL_NAME,
   BRAND_MERSIS,
@@ -37,7 +36,6 @@ export const COMPANY = {
   websiteUrl: BRAND_SITE_URL,
   emails: {
     info: BRAND_INFO_EMAIL,
-    admin: BRAND_ADMIN_EMAIL,
     support: BRAND_SUPPORT_EMAIL,
     kvkk: BRAND_KVKK_EMAIL,
   },
@@ -57,6 +55,20 @@ export const COMPANY = {
 
 export function displayRegistry(field: RegistryField): string {
   if (field.status === 'confirmed' && field.value.trim()) return field.value;
+  return field.placeholder;
+}
+
+/** True when a real value exists (even if still under legal review). */
+export function hasRegistryValue(field: RegistryField): boolean {
+  return Boolean(field.value.trim());
+}
+
+/**
+ * Prefer real configured values for UI panels. Falls back to placeholder only when empty.
+ * Does not invent company data.
+ */
+export function displayRegistryPreferValue(field: RegistryField): string {
+  if (field.value.trim()) return field.value.trim();
   return field.placeholder;
 }
 

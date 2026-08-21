@@ -1,4 +1,10 @@
 import { NextResponse } from 'next/server';
+import {
+  adminCookieOptions,
+  DOWNLOAD_ACCESS_COOKIE,
+  mergeAccessTokens,
+} from '@/lib/downloads/auth';
+import { getStoredPackageByProductId } from '@/lib/downloads/store';
 import { finalizeFromCallback } from '@/lib/payments/service';
 import { paymentLog, rateLimit, clientIp, stripCardFields } from '@/lib/payments/security';
 import { publicBaseUrl } from '@/lib/payments/config';
@@ -40,7 +46,20 @@ async function handle(request: Request) {
   const order = await finalizeFromCallback('qnbpay', payload);
   if (!order) return NextResponse.redirect(`${publicBaseUrl()}/payment/failure`);
   if (order.status === 'paid') {
-    return NextResponse.redirect(`${publicBaseUrl()}/payment/success?order=${encodeURIComponent(order.id)}`);
+    const response = NextResponse.redirect(
+      `${publicBaseUrl()}/payment/success?order=${encodeURIComponent(order.id)}`
+    );
+    const downloadPkg = await getStoredPackageByProductId(order.productId);
+    if (downloadPkg) {
+      const cookieHeader = request.headers.get('cookie') ?? '';
+      const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${DOWNLOAD_ACCESS_COOKIE}=([^;]*)`));
+      const existing = match?.[1] ? decodeURIComponent(match[1]) : undefined;
+      response.cookies.set(DOWNLOAD_ACCESS_COOKIE, mergeAccessTokens(existing, order.statusToken), {
+        ...adminCookieOptions(30 * 24 * 60 * 60),
+        sameSite: 'lax',
+      });
+    }
+    return response;
   }
   if (order.status === 'cancelled') {
     return NextResponse.redirect(`${publicBaseUrl()}/payment/cancelled?order=${encodeURIComponent(order.id)}`);

@@ -1,15 +1,14 @@
 import Link from 'next/link';
-import { PRODUCT_TICKET_GO, PRODUCT_TICKET_GO_URL } from '@/lib/site';
 
 const capabilities = [
-  'Feribot biletleme',
-  'Rezervasyon yönetimi',
-  'Elektronik bilet',
-  'B2B acente sistemi',
+  'Modüler ürün omurgası',
   'Operasyon yönetimi',
   'Müşteri yönetimi',
+  'B2B kanal yönetimi',
   'Ödeme entegrasyonları',
   'Bildirim altyapısı',
+  'Raporlama',
+  'API katmanı',
 ] as const;
 
 type TicketGoProductProps = {
@@ -18,36 +17,34 @@ type TicketGoProductProps = {
   compact?: boolean;
 };
 
+/**
+ * Corporate case-style block for TicketGo Teknoloji A.Ş. platform capability.
+ * Must not promote third-party ferry/ticketing brands or external product domains.
+ */
 export function TicketGoProduct({
-  id = 'ticket-go',
-  heading = PRODUCT_TICKET_GO,
+  id = 'dijital-platform',
+  heading = 'Dijital Platform Ürün Omurgası',
   compact = false,
 }: TicketGoProductProps) {
   return (
     <section id={id} className="surface-card min-w-0 scroll-section overflow-hidden p-6 sm:p-8">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Geliştirdiğimiz platform örneği</p>
+      <p className="eyebrow">Geliştirdiğimiz platform yaklaşımı</p>
       <h2 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{heading}</h2>
       <p className="mt-2 max-w-3xl text-sm font-medium leading-7 text-ink">
-        Rezervasyon, elektronik biletleme, B2B, operasyon, ödeme ve müşteri süreçlerini dijital ortamda bir araya getiren
-        platform.
+        Rezervasyon, satış, operasyon, ödeme ve müşteri süreçlerini aynı ürün omurgasında birleştiren kurumsal yazılım
+        yaklaşımı.
       </p>
       <div className="mt-5 max-w-3xl min-w-0 space-y-4 break-words text-sm leading-7 text-muted">
         <p>
-          Ticket-Go, TicketGo Teknoloji A.Ş. tarafından geliştirilen bir ürün platformudur. Deniz ulaşımı ve feribot
-          biletleme süreçlerini rezervasyondan operasyona kadar merkezi biçimde yönetmek üzere tasarlanmıştır.
+          TicketGo Teknoloji A.Ş.; ölçeklenebilir mimari, güvenlik ve sürdürülebilir işletim ilkeleriyle uçtan uca dijital
+          platformlar tasarlar, geliştirir ve işletir. Bu yaklaşım, sektörden bağımsız olarak iş süreçlerini
+          dijitalleştirmek için kullanılır.
         </p>
         {!compact ? (
-          <>
-            <p>
-              Platform; seferlerin görüntülenmesi, elektronik bilet, kapasite, acente satışı, ödeme ve müşteri yönetimini
-              aynı ürün omurgasında birleştirir. TicketGo Teknoloji A.Ş. bu ürünle sınırlı değildir; Ticket-Go, şirketin
-              uçtan uca dijital platform üretme kabiliyetini gösteren örneklerden biridir.
-            </p>
-            <p>
-              Canlı ürün ortamı ticket-go.net üzerinden yürür. Kurumsal şirket sitemiz ise yazılım, CRM, SaaS, web/mobil,
-              API ve otomasyon çözümlerini anlatır.
-            </p>
-          </>
+          <p>
+            Şirket; özel yazılım, CRM, SaaS, web/mobil uygulama, API entegrasyonu, otomasyon ve yapay zekâ servisleriyle
+            kurumsal ihtiyaçlara uçtan uca çözüm üretir. Tek bir ürünle sınırlı değildir.
+          </p>
         ) : null}
       </div>
       <div className="mt-6 flex flex-wrap gap-2">
@@ -58,15 +55,10 @@ export function TicketGoProduct({
         ))}
       </div>
       <div className="mt-8 flex flex-wrap gap-3">
-        <a
-          href={PRODUCT_TICKET_GO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-primary rounded-full"
-        >
-          Ticket-Go’yu İncele
-        </a>
-        <Link href="/contact?need=Ticket-Go" className="btn btn-secondary rounded-full">
+        <Link href="/solutions" className="btn btn-primary rounded-full">
+          Çözümleri İncele
+        </Link>
+        <Link href="/contact?need=Dijital%20Platform" className="btn btn-secondary rounded-full">
           Benzer bir platform konuşalım
         </Link>
       </div>

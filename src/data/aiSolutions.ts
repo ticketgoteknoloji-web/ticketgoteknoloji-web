@@ -9,6 +9,8 @@ export const aiSolutions: SolutionDetail[] = [
     description:
       'AI asistanları; sık sorulan işlemleri, bilgi sorgularını veya yönlendirmeyi mevcut CRM, destek veya iç portal ile konuşacak şekilde kurgulanabilir. Asistan, bağımsız bir ürün vaadi değil; bağlandığı sistem kadar işe yarar bir servis katmanıdır.',
     Icon: MessagesSquare,
+    cardImage: '/images/solutions/ai-integrations.webp',
+    hoverHints: ['Sisteme bağlı soru-yanıt', 'Yetki dahilinde veri okuma', 'Yönlendirme'],
     features: ['Sisteme bağlı soru-yanıt', 'Yetki dahilinde veri okuma', 'Yönlendirme', 'Kayıt bırakma', 'İnsan devri'],
     problems: ['Tekrarlayan destek soruları', 'İç prosedüre geç ulaşma', 'Kanal kopukluğu'],
     useCases: ['İç yardım masası', 'Müşteri ön yönlendirme', 'Bilgi tabanı sorgusu'],
@@ -28,6 +30,8 @@ export const aiSolutions: SolutionDetail[] = [
     description:
       'Doküman işleme; gelen dosyaların türünü ayırmak, temel alanları çıkarmak ve kaydı ilgili sürece aktarmak için kullanılabilir. Doğruluk kontrolü ve insan onayı süreç tasarımının parçasıdır.',
     Icon: FileSearch,
+    cardImage: '/images/process/process-analysis.webp',
+    hoverHints: ['Belge sınıflandırma', 'Alan çıkarımı', 'Yapılandırılmış kayıt'],
     features: ['Belge sınıflandırma', 'Alan çıkarımı', 'Yapılandırılmış kayıt', 'Onay adımı', 'Arşiv bağlantısı'],
     problems: ['Elle veri girişi', 'Belge yığılması', 'Yanlış klasörleme'],
     useCases: ['Başvuru evrakı', 'Sözleşme tasnifi', 'Fatura / form akışı'],
@@ -47,6 +51,8 @@ export const aiSolutions: SolutionDetail[] = [
     description:
       'Akıllı arama; prosedür, kayıt veya ürün bilgisini anahtar kelimeye bağlı kalmadan bulmayı hedefler. Kaynaklar ve yetki modeli netleşmeden arama kalitesi iddia edilmez.',
     Icon: Search,
+    cardImage: '/images/process/process-discovery.webp',
+    hoverHints: ['Doğal dil sorgu', 'Yetkili kaynaklar', 'Sonuç özeti'],
     features: ['Doğal dil sorgu', 'Yetkili kaynaklar', 'Sonuç özeti', 'Kaynak gösterimi', 'Filtre'],
     problems: ['Bilginin klasörlerde kaybolması', 'Anahtar kelimeye bağımlılık', 'Yeni çalışanın sürece geç alışması'],
     useCases: ['İç bilgi tabanı', 'Ürün dokümantasyonu', 'Destek içerikleri'],
@@ -66,6 +72,8 @@ export const aiSolutions: SolutionDetail[] = [
     description:
       'AI destekli raporlama; mevcut dashboard verisini kısa özet, eğilim notu veya açıklayıcı metne dönüştürebilir. Sayılar sistemden gelir; model yalnızca anlatımı kolaylaştırır. Demo veri dışında gerçek performans iddiası taşınmaz.',
     Icon: Sparkles,
+    cardImage: '/images/solutions/management-dashboard.webp',
+    hoverHints: ['Veri özeti', 'Trend anlatımı', 'Rol bazlı açıklama'],
     features: ['Veri özeti', 'Trend anlatımı', 'Rol bazlı açıklama', 'Dashboard bağlantısı', 'Export'],
     problems: ['Raporun yalnızca tablo olarak kalması', 'Yönetimin özeti geç üretmesi', 'Farklı ekiplerin aynı veriyi farklı okuması'],
     useCases: ['Yönetim özeti', 'Operasyon günlük notu', 'Satış görünümü'],
@@ -83,6 +91,8 @@ export const aiSolutions: SolutionDetail[] = [
     description:
       'Otomasyon; bir kaydın sınıflandırılması, önceliklendirilmesi veya ilgili ekibe yönlendirilmesi gibi adımlarda AI servisini kural motoruyla birlikte kullanır. Kritik kararlarda insan onayı bırakılabilir.',
     Icon: Workflow,
+    cardImage: '/images/solutions/workflow-automation.webp',
+    hoverHints: ['Tetikleyici', 'Sınıflandırma', 'Yönlendirme'],
     features: ['Tetikleyici', 'Sınıflandırma', 'Yönlendirme', 'Onay kapısı', 'Log'],
     problems: ['Elle kuyruk yönetimi', 'Önceliğin geç belli olması', 'Yanlış ekibe düşen işler'],
     useCases: ['Destek kuyruğu', 'Başvuru tasnifi', 'İç talep yönlendirme'],
@@ -102,6 +112,8 @@ export const aiSolutions: SolutionDetail[] = [
     description:
       'Müşteri deneyimi senaryoları; ilk yanıt, konu tespiti veya ilgili kayda bağlama gibi adımlarda AI kullanabilir. Amaç, destek ekibinin yerini almak değil; tekrarlayan iletişimi daha düzenli hale getirmektir.',
     Icon: Bot,
+    cardImage: '/images/solutions/customer-portal.webp',
+    hoverHints: ['Konu tespiti', 'İlk yanıt taslağı', 'Kayıt eşleme'],
     features: ['Konu tespiti', 'İlk yanıt taslağı', 'Kayıt eşleme', 'Memnuniyet notu', 'İnsan devri'],
     problems: ['Aynı sorunun tekrar sorulması', 'Talebin yanlış kuyruğa düşmesi', 'Geçmiş kaydın bulunamaması'],
     useCases: ['Destek kanalları', 'Portal mesajları', 'Satış sonrası iletişim'],
