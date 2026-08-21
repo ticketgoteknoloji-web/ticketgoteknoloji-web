@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -10,17 +10,20 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const downloadsData = readFileSync(join(root, 'src/data/downloads.ts'), 'utf8');
 const configSrc = readFileSync(join(root, 'src/lib/downloads/config.ts'), 'utf8');
+const authSrc = readFileSync(join(root, 'src/lib/downloads/auth.ts'), 'utf8');
 const storeSrc = readFileSync(join(root, 'src/lib/downloads/store.ts'), 'utf8');
 const storageSrc = readFileSync(join(root, 'src/lib/downloads/storage.ts'), 'utf8');
 const table = readFileSync(join(root, 'src/components/download/DownloadTable.tsx'), 'utf8');
 const uploadModal = readFileSync(join(root, 'src/components/download/AdminUploadModal.tsx'), 'utf8');
 const page = readFileSync(join(root, 'src/app/download/page.tsx'), 'utf8');
 const loginRoute = readFileSync(join(root, 'src/app/api/downloads/admin/login/route.ts'), 'utf8');
+const sessionRoute = readFileSync(join(root, 'src/app/api/downloads/admin/session/route.ts'), 'utf8');
 const uploadRoute = readFileSync(join(root, 'src/app/api/downloads/admin/upload/route.ts'), 'utf8');
 const fileRoute = readFileSync(join(root, 'src/app/api/downloads/[productId]/file/route.ts'), 'utf8');
 const accessRoute = readFileSync(join(root, 'src/app/api/downloads/[productId]/access/route.ts'), 'utf8');
 const envExample = readFileSync(join(root, '.env.example'), 'utf8');
 const gitignore = readFileSync(join(root, '.gitignore'), 'utf8');
+const hashScript = readFileSync(join(root, 'scripts/hash-download-admin-code.mjs'), 'utf8');
 
 const FORBIDDEN = [
   /feribot/i,
@@ -32,6 +35,24 @@ const FORBIDDEN = [
   /Array\.from\(\{\s*length:\s*20/,
 ];
 
+function hashCode(code) {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(code, salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
+}
+
+function verifyCode(code, stored) {
+  if (!code || !stored) return false;
+  const parts = stored.split('$');
+  if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
+  const [, salt, expectedHex] = parts;
+  if (!salt || !expectedHex) return false;
+  const actual = scryptSync(code, salt, 64);
+  const expected = Buffer.from(expectedHex, 'hex');
+  if (actual.length !== expected.length) return false;
+  return timingSafeEqual(actual, expected);
+}
+
 test('no demo/fake download catalog rows in client data', () => {
   assert.doesNotMatch(downloadsData, /DOWNLOAD_PACKAGES/);
   assert.doesNotMatch(downloadsData, /isDemo:\s*true/);
@@ -41,15 +62,49 @@ test('no demo/fake download catalog rows in client data', () => {
   assert.doesNotMatch(table, /fakeDownloads/);
 });
 
-test('admin password is env-hash based, not hardcoded', () => {
-  assert.match(configSrc, /DOWNLOAD_ADMIN_PASSWORD_HASH/);
-  assert.match(configSrc, /scrypt/);
-  assert.doesNotMatch(loginRoute, /const ADMIN_PASSWORD\s*=/);
-  assert.match(loginRoute, /authenticateAdminCredentials/);
-  assert.match(envExample, /DOWNLOAD_ADMIN_EMAIL=/);
-  assert.match(envExample, /DOWNLOAD_ADMIN_PASSWORD_HASH=/);
-  assert.match(envExample, /DOWNLOAD_STORAGE_DIR=/);
-  assert.doesNotMatch(envExample, /scrypt\$/);
+test('admin authentication uses code hash, not email/password', () => {
+  assert.match(configSrc, /DOWNLOAD_ADMIN_CODE_HASH|expectedAdminCodeHash/);
+  assert.match(configSrc, /hashDownloadAdminCode/);
+  assert.match(configSrc, /verifyDownloadAdminCode/);
+  assert.match(configSrc, /timingSafeEqual/);
+  assert.doesNotMatch(configSrc, /DOWNLOAD_ADMIN_EMAIL/);
+  assert.doesNotMatch(configSrc, /DOWNLOAD_ADMIN_PASSWORD_HASH/);
+  assert.doesNotMatch(authSrc, /authenticateAdminCredentials/);
+  assert.match(authSrc, /authenticateAdminCode/);
+  assert.match(authSrc, /role:\s*DOWNLOAD_ADMIN_ROLE|role: typeof DOWNLOAD_ADMIN_ROLE/);
+  assert.match(loginRoute, /authenticateAdminCode/);
+  assert.match(loginRoute, /body\.code|code:/);
+  assert.doesNotMatch(loginRoute, /body\.email/);
+  assert.doesNotMatch(loginRoute, /body\.password/);
+  assert.match(loginRoute, /Yönetici kodu hatalı/);
+  assert.match(envExample, /DOWNLOAD_ADMIN_CODE_HASH=/);
+  assert.doesNotMatch(envExample, /DOWNLOAD_ADMIN_EMAIL=/);
+  assert.doesNotMatch(envExample, /DOWNLOAD_ADMIN_PASSWORD_HASH=/);
+  assert.match(hashScript, /DOWNLOAD_ADMIN_CODE_HASH=/);
+  assert.doesNotMatch(hashScript, /console\.log\(code\)/);
+  assert.doesNotMatch(uploadModal, /type=\"email\"/);
+  assert.match(uploadModal, /Yönetici Kodu/);
+  assert.match(uploadModal, /Devam Et/);
+  assert.match(uploadModal, /type=\"password\"/);
+  assert.doesNotMatch(table, /AdminLoginModal/);
+  assert.doesNotMatch(table, /Kullanıcı adı/);
+});
+
+test('admin code scrypt verify accepts correct and rejects wrong codes', () => {
+  const stored = hashCode('correct-admin-code-for-test');
+  assert.equal(verifyCode('correct-admin-code-for-test', stored), true);
+  assert.equal(verifyCode('wrong-code', stored), false);
+  assert.equal(verifyCode('', stored), false);
+  assert.equal(verifyCode('correct-admin-code-for-test', ''), false);
+  assert.equal(verifyCode('correct-admin-code-for-test', 'not-a-hash'), false);
+});
+
+test('plaintext admin code is not embedded in source', () => {
+  const sources = [configSrc, authSrc, loginRoute, sessionRoute, uploadRoute, uploadModal, table, envExample];
+  for (const src of sources) {
+    assert.doesNotMatch(src, /DOWNLOAD_ADMIN_CODE\s*=\s*['\"][^'\"]+['\"]/);
+    assert.doesNotMatch(src, /adminCode\s*=\s*['\"][^'\"]{8,}['\"]/);
+  }
 });
 
 test('upload and file routes enforce auth and private storage', () => {
@@ -71,6 +126,11 @@ test('upload and file routes enforce auth and private storage', () => {
   assert.match(storeSrc, /grantDownloadEntitlement/);
   assert.match(storeSrc, /revokeDownloadEntitlementsForOrder/);
   assert.match(gitignore, /\.storage/);
+  assert.match(authSrc, /httpOnly:\s*true/);
+  assert.match(authSrc, /sameSite:\s*'strict'/);
+  assert.match(sessionRoute, /authenticated:\s*true/);
+  assert.match(sessionRoute, /authenticated:\s*false/);
+  assert.doesNotMatch(sessionRoute, /email:/);
 });
 
 test('payment claim flow never trusts client paid flags', () => {
@@ -176,7 +236,6 @@ test('isolated free package metadata fixture validates expected shape', () => {
       'utf8'
     );
 
-    // Isolated path — never the repo/production metadata file.
     assert.notEqual(fixtureDbPath, join(root, '.data', 'downloads.json'));
     assert.ok(!fixtureDbPath.startsWith(join(root, '.data')));
 

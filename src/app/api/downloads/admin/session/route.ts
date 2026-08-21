@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ authenticated: false }, { headers: { 'Cache-Control': 'private, no-store' } });
   }
   return NextResponse.json(
-    { authenticated: true, email: session.email, exp: session.exp },
+    { authenticated: true },
     { headers: { 'Cache-Control': 'private, no-store' } }
   );
 }

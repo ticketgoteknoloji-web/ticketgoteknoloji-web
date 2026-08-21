@@ -16,7 +16,12 @@ const MAX_FILE_SIZE_MB = (() => {
 })();
 
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-const ZIP_ACCEPT = '.zip,application/zip,application/x-zip-compressed';
+
+/** Align with server DOWNLOAD_ALLOWED_EXTENSIONS (excl. tar.gz compound handled server-side). */
+const FILE_ACCEPT =
+  '.zip,.dmg,.pkg,.exe,.msi,.apk,.txt,application/zip,application/x-zip-compressed,application/octet-stream,text/plain,application/vnd.android.package-archive';
+
+const ALLOWED_EXTENSIONS = new Set(['zip', 'dmg', 'pkg', 'exe', 'msi', 'apk', 'txt']);
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -25,23 +30,21 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function isZipFile(file: File): boolean {
-  const name = file.name.toLowerCase();
-  if (!name.endsWith('.zip')) return false;
-  const mime = (file.type || '').toLowerCase().split(';')[0]?.trim() ?? '';
-  if (!mime) return true;
-  return (
-    mime === 'application/zip' ||
-    mime === 'application/x-zip-compressed' ||
-    mime === 'application/octet-stream'
-  );
+function extensionOf(fileName: string): string | null {
+  const base = fileName.split(/[/\\]/).pop()?.toLowerCase() ?? '';
+  const parts = base.split('.');
+  if (parts.length < 2) return null;
+  return parts[parts.length - 1] ?? null;
 }
 
 function validateSelectedFile(file: File | null): string | null {
-  if (!file) return 'Lütfen bir ZIP dosyası seçin.';
+  if (!file) return 'Lütfen bir yazılım dosyası seçin.';
   if (!file.name.trim()) return 'Geçersiz dosya adı.';
-  if (!isZipFile(file)) return 'Yalnızca ZIP dosyaları yüklenebilir.';
-  if (file.size <= 0) return 'Lütfen bir ZIP dosyası seçin.';
+  const ext = extensionOf(file.name);
+  if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+    return 'Desteklenen türler: ZIP, DMG, PKG, EXE, MSI, APK, TXT.';
+  }
+  if (file.size <= 0) return 'Lütfen bir yazılım dosyası seçin.';
   if (file.size > MAX_FILE_SIZE_BYTES) {
     return 'Dosya izin verilen maksimum boyutu aşıyor.';
   }
@@ -52,6 +55,8 @@ type AdminUploadModalProps = {
   open: boolean;
   onClose: () => void;
   onUploaded: () => void;
+  onAuthenticated?: () => void;
+  initiallyAuthenticated?: boolean;
   returnFocusRef: React.MutableRefObject<HTMLElement | null>;
 };
 
@@ -59,14 +64,22 @@ export function AdminUploadModal({
   open,
   onClose,
   onUploaded,
+  onAuthenticated,
+  initiallyAuthenticated = false,
   returnFocusRef,
 }: AdminUploadModalProps) {
   const titleId = useId();
   const fileInputId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const dragDepthRef = useRef(0);
+
+  const [step, setStep] = useState<'auth' | 'upload'>(initiallyAuthenticated ? 'upload' : 'auth');
+  const [adminCode, setAdminCode] = useState('');
+  const [authPending, setAuthPending] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const [pending, setPending] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
@@ -77,12 +90,12 @@ export function AdminUploadModal({
   const [dragging, setDragging] = useState(false);
 
   const requestClose = useCallback(() => {
-    if (pending) {
-      const ok = window.confirm('Yükleme devam ediyor. Modalı kapatmak istediğinize emin misiniz?');
+    if (pending || authPending) {
+      const ok = window.confirm('İşlem devam ediyor. Modalı kapatmak istediğinize emin misiniz?');
       if (!ok) return;
     }
     onClose();
-  }, [onClose, pending]);
+  }, [onClose, pending, authPending]);
 
   useEffect(() => {
     if (!open) return;
@@ -91,6 +104,10 @@ export function AdminUploadModal({
 
   useEffect(() => {
     if (!open) {
+      setStep(initiallyAuthenticated ? 'upload' : 'auth');
+      setAdminCode('');
+      setAuthPending(false);
+      setAuthError(null);
       setPending(false);
       setProgress(null);
       setError(null);
@@ -104,9 +121,40 @@ export function AdminUploadModal({
       returnFocusRef.current?.focus();
       return;
     }
-    const t = window.setTimeout(() => closeRef.current?.focus(), 60);
-    return () => window.clearTimeout(t);
-  }, [open, returnFocusRef]);
+
+    let cancelled = false;
+    const boot = async () => {
+      if (initiallyAuthenticated) {
+        setStep('upload');
+        return;
+      }
+      try {
+        const res = await fetch('/api/downloads/admin/session', { cache: 'no-store' });
+        const json = (await res.json()) as { authenticated?: boolean };
+        if (cancelled) return;
+        if (json.authenticated) {
+          setStep('upload');
+          onAuthenticated?.();
+        } else {
+          setStep('auth');
+        }
+      } catch {
+        if (!cancelled) setStep('auth');
+      }
+    };
+    void boot();
+
+    const t = window.setTimeout(() => {
+      if (step === 'auth') codeInputRef.current?.focus();
+      else closeRef.current?.focus();
+    }, 60);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+    // intentionally only on open / initiallyAuthenticated
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initiallyAuthenticated, onAuthenticated, returnFocusRef]);
 
   useEffect(() => {
     if (!open) return;
@@ -119,6 +167,38 @@ export function AdminUploadModal({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [open, requestClose]);
+
+  useEffect(() => {
+    if (!open || step !== 'auth') return;
+    const t = window.setTimeout(() => codeInputRef.current?.focus(), 40);
+    return () => window.clearTimeout(t);
+  }, [open, step]);
+
+  const onAuthSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (authPending) return;
+    setAuthPending(true);
+    setAuthError(null);
+    try {
+      const res = await fetch('/api/downloads/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: adminCode }),
+      });
+      const data = (await res.json()) as { error?: string; ok?: boolean };
+      if (!res.ok) {
+        setAuthError(data.error || 'Yönetici kodu hatalı.');
+        return;
+      }
+      setAdminCode('');
+      setStep('upload');
+      onAuthenticated?.();
+    } catch {
+      setAuthError('Doğrulama başarısız. Lütfen tekrar deneyin.');
+    } finally {
+      setAuthPending(false);
+    }
+  };
 
   const applyFile = useCallback((next: File | null) => {
     if (!next) {
@@ -234,6 +314,12 @@ export function AdminUploadModal({
     try {
       const result = await uploadWithProgress(data);
       if (!result.ok) {
+        if (result.status === 401 || result.status === 403) {
+          setStep('auth');
+          setAuthError('Oturum sona erdi. Lütfen yönetici kodunu tekrar girin.');
+          setProgress(null);
+          return;
+        }
         setError(result.json.error || 'Yükleme başarısız.');
         setProgress(null);
         return;
@@ -263,18 +349,16 @@ export function AdminUploadModal({
         if (e.target === e.currentTarget) requestClose();
       }}
     >
-      <div
-        className="upload-modal-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-      >
+      <div className="upload-modal-panel" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <header className="upload-modal-header">
           <div className="min-w-0 pr-2">
             <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">{BRAND_LEGAL_NAME}</p>
             <h2 id={titleId} className="mt-1 text-base font-semibold text-ink sm:text-lg">
-              Yazılım Paketi Yükle
+              {step === 'auth' ? 'Yönetici Doğrulaması' : 'Yazılım Paketi Yükle'}
             </h2>
+            {step === 'auth' ? (
+              <p className="mt-1 text-sm text-muted">Yazılım paketi yüklemek için yönetici kodunu girin.</p>
+            ) : null}
           </div>
           <button
             ref={closeRef}
@@ -287,237 +371,274 @@ export function AdminUploadModal({
           </button>
         </header>
 
-        <form ref={formRef} className="upload-modal-form" onSubmit={onSubmit} noValidate>
-          <div className="upload-modal-body">
-            <label className="block text-sm">
-              <span className="font-medium text-ink">Yazılım adı</span>
-              <input
-                name="name"
-                required
-                maxLength={120}
-                disabled={pending}
-                className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm"
-              />
-            </label>
-
-            <label className="block text-sm">
-              <span className="font-medium text-ink">Kısa açıklama</span>
-              <textarea
-                name="description"
-                required
-                maxLength={500}
-                rows={3}
-                disabled={pending}
-                className="mt-1.5 w-full rounded-xl border border-line px-3 py-2 text-sm"
-              />
-            </label>
-
-            <fieldset className="block text-sm" disabled={pending}>
-              <legend className="font-medium text-ink">Platform</legend>
-              <p className="mt-1 text-xs text-muted">Birden fazla seçilebilir; aynı dosya tek kayıt olarak kalır.</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {DOWNLOAD_PLATFORM_IDS.map((id) => (
-                  <label
-                    key={id}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-medium text-ink"
-                  >
-                    <input type="checkbox" name="platforms" value={id} className="h-4 w-4 rounded border-line text-brand-600" />
-                    {DOWNLOAD_PLATFORM_LABELS[id]}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
-            <div className="grid gap-3 sm:grid-cols-2">
+        {step === 'auth' ? (
+          <form className="upload-modal-form" onSubmit={onAuthSubmit}>
+            <div className="upload-modal-body">
               <label className="block text-sm">
-                <span className="font-medium text-ink">Sürüm</span>
+                <span className="font-medium text-ink">Yönetici Kodu</span>
                 <input
-                  name="version"
+                  ref={codeInputRef}
+                  type="password"
+                  name="adminCode"
+                  autoComplete="off"
                   required
-                  maxLength={40}
-                  placeholder="v1.0.0"
-                  disabled={pending}
-                  className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm"
+                  maxLength={256}
+                  value={adminCode}
+                  disabled={authPending}
+                  onChange={(e) => setAdminCode(e.target.value)}
+                  className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
                 />
               </label>
+              {authError ? (
+                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+                  {authError}
+                </p>
+              ) : null}
+            </div>
+            <footer className="upload-modal-footer">
+              <button type="button" className="btn btn-secondary min-h-11 flex-1 sm:flex-none" onClick={requestClose}>
+                İptal
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary min-h-11 flex-1 sm:flex-none sm:min-w-[8.5rem]"
+                disabled={authPending || !adminCode.trim()}
+              >
+                {authPending ? 'Doğrulanıyor…' : 'Devam Et'}
+              </button>
+            </footer>
+          </form>
+        ) : (
+          <form ref={formRef} className="upload-modal-form" onSubmit={onSubmit} noValidate>
+            <div className="upload-modal-body">
               <label className="block text-sm">
-                <span className="font-medium text-ink">Mimari</span>
+                <span className="font-medium text-ink">Yazılım adı</span>
                 <input
-                  name="architecture"
-                  defaultValue="Universal"
-                  maxLength={40}
+                  name="name"
+                  required
+                  maxLength={120}
                   disabled={pending}
                   className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm"
                 />
               </label>
-              <label className="block text-sm sm:col-span-2">
-                <span className="font-medium text-ink">Fiyat (USD)</span>
-                <input
-                  name="priceUsd"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder="Boş = satışa kapalı"
+
+              <label className="block text-sm">
+                <span className="font-medium text-ink">Kısa açıklama</span>
+                <textarea
+                  name="description"
+                  required
+                  maxLength={500}
+                  rows={3}
                   disabled={pending}
-                  className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm sm:max-w-xs"
+                  className="mt-1.5 w-full rounded-xl border border-line px-3 py-2 text-sm"
                 />
               </label>
-            </div>
 
-            <div className="block text-sm">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-medium text-ink" id={`${fileInputId}-label`}>
-                  Yazılım Dosyası (ZIP) <span className="text-red-600">*</span>
-                </span>
-              </div>
+              <fieldset className="block text-sm" disabled={pending}>
+                <legend className="font-medium text-ink">Platform</legend>
+                <p className="mt-1 text-xs text-muted">Birden fazla seçilebilir; aynı dosya tek kayıt olarak kalır.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {DOWNLOAD_PLATFORM_IDS.map((id) => (
+                    <label
+                      key={id}
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-medium text-ink"
+                    >
+                      <input type="checkbox" name="platforms" value={id} className="h-4 w-4 rounded border-line text-brand-600" />
+                      {DOWNLOAD_PLATFORM_LABELS[id]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
 
-              <input
-                ref={fileInputRef}
-                id={fileInputId}
-                name="file"
-                type="file"
-                accept={ZIP_ACCEPT}
-                className="sr-only"
-                tabIndex={-1}
-                aria-labelledby={`${fileInputId}-label`}
-                disabled={pending}
-                onChange={(e) => {
-                  applyFile(e.target.files?.[0] ?? null);
-                }}
-              />
-
-              {!file ? (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-describedby={`${fileInputId}-hint`}
-                  className={`upload-dropzone mt-1.5 ${dragging ? 'upload-dropzone-active' : ''}`}
-                  onClick={() => {
-                    if (!pending) fileInputRef.current?.click();
-                  }}
-                  onKeyDown={(e) => {
-                    if (pending) return;
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  onDragEnter={onDropZoneDragEnter}
-                  onDragOver={onDropZoneDragOver}
-                  onDragLeave={onDropZoneDragLeave}
-                  onDrop={onDropZoneDrop}
-                >
-                  <CloudUpload className="mx-auto text-brand-600" size={32} aria-hidden />
-                  <p className="mt-3 text-sm font-semibold text-ink">ZIP dosyanızı buraya sürükleyin</p>
-                  <p className="mt-1 text-xs text-muted">veya</p>
-                  <button
-                    type="button"
-                    className="btn btn-secondary mt-3 min-h-10 px-4"
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="font-medium text-ink">Sürüm</span>
+                  <input
+                    name="version"
+                    required
+                    maxLength={40}
+                    placeholder="v1.0.0"
                     disabled={pending}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      fileInputRef.current?.click();
-                    }}
-                  >
-                    Dosya Seç
-                  </button>
-                  <p id={`${fileInputId}-hint`} className="mt-3 text-xs text-muted">
-                    Yalnızca .zip dosyaları
-                    <br />
-                    Maksimum dosya boyutu: {MAX_FILE_SIZE_MB.toLocaleString('tr-TR')} MB
-                  </p>
-                </div>
-              ) : (
-                <div
-                  className={`upload-file-selected mt-1.5 ${dragging ? 'upload-dropzone-active' : ''}`}
-                  onDragEnter={onDropZoneDragEnter}
-                  onDragOver={onDropZoneDragOver}
-                  onDragLeave={onDropZoneDragLeave}
-                  onDrop={onDropZoneDrop}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-brand-600">
-                      <FileArchive size={20} aria-hidden />
-                    </span>
-                    <dl className="min-w-0 flex-1 space-y-1 text-sm">
-                      <div>
-                        <dt className="text-xs text-muted">Dosya</dt>
-                        <dd className="truncate font-semibold text-ink" title={file.name}>
-                          {file.name}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs text-muted">Boyut</dt>
-                        <dd className="font-medium text-ink">{formatBytes(file.size)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs text-muted">Durum</dt>
-                        <dd className="font-medium text-emerald-700">
-                          {pending ? 'Yükleniyor…' : 'Yüklemeye hazır'}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="btn btn-secondary min-h-10 px-3 text-sm"
-                      disabled={pending}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Değiştir
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost min-h-10 px-3 text-sm"
-                      disabled={pending}
-                      onClick={() => applyFile(null)}
-                    >
-                      Kaldır
-                    </button>
-                  </div>
-                </div>
-              )}
+                    className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-ink">Mimari</span>
+                  <input
+                    name="architecture"
+                    defaultValue="Universal"
+                    maxLength={40}
+                    disabled={pending}
+                    className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm"
+                  />
+                </label>
+                <label className="block text-sm sm:col-span-2">
+                  <span className="font-medium text-ink">Fiyat (USD)</span>
+                  <input
+                    name="priceUsd"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="Boş = satışa kapalı"
+                    disabled={pending}
+                    className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm sm:max-w-xs"
+                  />
+                </label>
+              </div>
 
-              {fileError ? <p className="mt-2 text-sm text-red-700">{fileError}</p> : null}
+              <div className="block text-sm">
+                <span className="font-medium text-ink" id={`${fileInputId}-label`}>
+                  Yazılım Dosyası <span className="text-red-600">*</span>
+                </span>
+
+                <input
+                  ref={fileInputRef}
+                  id={fileInputId}
+                  name="file"
+                  type="file"
+                  accept={FILE_ACCEPT}
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-labelledby={`${fileInputId}-label`}
+                  disabled={pending}
+                  onChange={(e) => {
+                    applyFile(e.target.files?.[0] ?? null);
+                  }}
+                />
+
+                {!file ? (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-describedby={`${fileInputId}-hint`}
+                    className={`upload-dropzone mt-1.5 ${dragging ? 'upload-dropzone-active' : ''}`}
+                    onClick={() => {
+                      if (!pending) fileInputRef.current?.click();
+                    }}
+                    onKeyDown={(e) => {
+                      if (pending) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        fileInputRef.current?.click();
+                      }
+                    }}
+                    onDragEnter={onDropZoneDragEnter}
+                    onDragOver={onDropZoneDragOver}
+                    onDragLeave={onDropZoneDragLeave}
+                    onDrop={onDropZoneDrop}
+                  >
+                    <CloudUpload className="mx-auto text-brand-600" size={32} aria-hidden />
+                    <p className="mt-3 text-sm font-semibold text-ink">Dosyanızı buraya sürükleyin</p>
+                    <p className="mt-1 text-xs text-muted">veya</p>
+                    <button
+                      type="button"
+                      className="btn btn-secondary mt-3 min-h-10 px-4"
+                      disabled={pending}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                    >
+                      Dosya Seç
+                    </button>
+                    <p id={`${fileInputId}-hint`} className="mt-3 text-xs text-muted">
+                      ZIP, DMG, PKG, EXE, MSI, APK, TXT
+                      <br />
+                      Maksimum dosya boyutu: {MAX_FILE_SIZE_MB.toLocaleString('tr-TR')} MB
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    className={`upload-file-selected mt-1.5 ${dragging ? 'upload-dropzone-active' : ''}`}
+                    onDragEnter={onDropZoneDragEnter}
+                    onDragOver={onDropZoneDragOver}
+                    onDragLeave={onDropZoneDragLeave}
+                    onDrop={onDropZoneDrop}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-brand-600">
+                        <FileArchive size={20} aria-hidden />
+                      </span>
+                      <dl className="min-w-0 flex-1 space-y-1 text-sm">
+                        <div>
+                          <dt className="text-xs text-muted">Dosya</dt>
+                          <dd className="truncate font-semibold text-ink" title={file.name}>
+                            {file.name}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-muted">Boyut</dt>
+                          <dd className="font-medium text-ink">{formatBytes(file.size)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-muted">Durum</dt>
+                          <dd className="font-medium text-emerald-700">
+                            {pending ? 'Yükleniyor…' : 'Yüklemeye hazır'}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-secondary min-h-10 px-3 text-sm"
+                        disabled={pending}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Değiştir
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost min-h-10 px-3 text-sm"
+                        disabled={pending}
+                        onClick={() => applyFile(null)}
+                      >
+                        Kaldır
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {fileError ? <p className="mt-2 text-sm text-red-700">{fileError}</p> : null}
+              </div>
+
+              {progress != null ? (
+                <div className="space-y-1.5" aria-live="polite">
+                  <div className="flex items-center justify-between text-xs text-muted">
+                    <span>{pending ? 'Yükleniyor…' : 'Tamamlandı'}</span>
+                    <span>%{progress}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-brand-600 transition-[width] duration-200"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {error ? (
+                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              {success ? (
+                <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800" role="status">
+                  {success}
+                </p>
+              ) : null}
             </div>
 
-            {progress != null ? (
-              <div className="space-y-1.5" aria-live="polite">
-                <div className="flex items-center justify-between text-xs text-muted">
-                  <span>{pending ? 'Yükleniyor…' : 'Tamamlandı'}</span>
-                  <span>%{progress}</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-brand-600 transition-[width] duration-200"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            {error ? (
-              <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {success ? (
-              <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800" role="status">
-                {success}
-              </p>
-            ) : null}
-          </div>
-
-          <footer className="upload-modal-footer">
-            <button type="button" className="btn btn-secondary min-h-11 flex-1 sm:flex-none" onClick={requestClose}>
-              İptal
-            </button>
-            <button type="submit" className="btn btn-primary min-h-11 flex-1 sm:flex-none sm:min-w-[8.5rem]" disabled={pending}>
-              {pending ? 'Yükleniyor…' : 'Yükle'}
-            </button>
-          </footer>
-        </form>
+            <footer className="upload-modal-footer">
+              <button type="button" className="btn btn-secondary min-h-11 flex-1 sm:flex-none" onClick={requestClose}>
+                İptal
+              </button>
+              <button type="submit" className="btn btn-primary min-h-11 flex-1 sm:flex-none sm:min-w-[8.5rem]" disabled={pending}>
+                {pending ? 'Yükleniyor…' : 'Yükle'}
+              </button>
+            </footer>
+          </form>
+        )}
       </div>
     </div>,
     document.body

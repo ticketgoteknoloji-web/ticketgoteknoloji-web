@@ -3,10 +3,11 @@ import {
   ADMIN_TTL_MS,
   adminCookieOptions,
   adminLoginAllowed,
-  authenticateAdminCredentials,
+  authenticateAdminCode,
   DOWNLOAD_ADMIN_COOKIE,
   encodeAdminSession,
 } from '@/lib/downloads/auth';
+import { DOWNLOAD_ADMIN_CODE_MAX_LENGTH } from '@/lib/downloads/config';
 import { clientIp, paymentLog } from '@/lib/payments/security';
 
 export const runtime = 'nodejs';
@@ -21,22 +22,26 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { email?: string; password?: string };
+  let body: { code?: unknown };
   try {
-    body = (await request.json()) as { email?: string; password?: string };
+    body = (await request.json()) as { code?: unknown };
   } catch {
-    return NextResponse.json({ error: 'Kullanıcı adı veya şifre hatalı.' }, { status: 400 });
+    return NextResponse.json({ error: 'Yönetici kodu hatalı.' }, { status: 400 });
   }
 
-  const email = typeof body.email === 'string' ? body.email : '';
-  const password = typeof body.password === 'string' ? body.password : '';
-  const ok = authenticateAdminCredentials(email, password);
+  const code = typeof body.code === 'string' ? body.code : '';
+  if (!code || code.length > DOWNLOAD_ADMIN_CODE_MAX_LENGTH) {
+    paymentLog('download_admin_login_failed', { ip });
+    return NextResponse.json({ error: 'Yönetici kodu hatalı.' }, { status: 401 });
+  }
+
+  const ok = authenticateAdminCode(code);
   if (!ok) {
     paymentLog('download_admin_login_failed', { ip });
-    return NextResponse.json({ error: 'Kullanıcı adı veya şifre hatalı.' }, { status: 401 });
+    return NextResponse.json({ error: 'Yönetici kodu hatalı.' }, { status: 401 });
   }
 
-  const token = encodeAdminSession(email);
+  const token = encodeAdminSession();
   const response = NextResponse.json({ ok: true });
   response.cookies.set(DOWNLOAD_ADMIN_COOKIE, token, adminCookieOptions(Math.floor(ADMIN_TTL_MS / 1000)));
   paymentLog('download_admin_login_ok', { ip });

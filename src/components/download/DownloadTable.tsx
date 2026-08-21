@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Download, Search, Upload, X } from 'lucide-react';
 import { BuyButton } from '@/components/BuyButton';
 import { AdminUploadModal } from '@/components/download/AdminUploadModal';
@@ -15,8 +14,6 @@ import {
   type DownloadPlatformId,
 } from '@/data/downloads';
 import type { PublicDownloadPackage } from '@/lib/downloads/types';
-import { acquireScrollLock } from '@/lib/scroll-lock';
-import { BRAND_LEGAL_NAME } from '@/lib/site';
 import { formatMoney } from '@/lib/money';
 
 type AccessInfo = {
@@ -66,134 +63,6 @@ function EmptyDownloadState({ onUpload }: { onUpload: () => void }) {
   );
 }
 
-function AdminLoginModal({
-  open,
-  onClose,
-  onSuccess,
-  returnFocusRef,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-  returnFocusRef: React.MutableRefObject<HTMLElement | null>;
-}) {
-  const titleId = useId();
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    return acquireScrollLock();
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      const t = window.setTimeout(() => closeRef.current?.focus(), 60);
-      return () => window.clearTimeout(t);
-    }
-    returnFocusRef.current?.focus();
-  }, [open, returnFocusRef]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
-  if (!open || typeof document === 'undefined') return null;
-
-  return createPortal(
-    <div
-      className="site-modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="site-modal-panel max-w-md">
-        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">{BRAND_LEGAL_NAME}</p>
-            <h2 id={titleId} className="mt-1 text-base font-semibold text-ink">
-              Admin Girişi
-            </h2>
-          </div>
-          <button ref={closeRef} type="button" aria-label="Kapat" className="btn btn-ghost h-9 w-9 p-0" onClick={onClose}>
-            <X size={18} aria-hidden />
-          </button>
-        </div>
-        <form
-          className="space-y-4 px-6 py-5"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setPending(true);
-            setError(null);
-            try {
-              const res = await fetch('/api/downloads/admin/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
-              });
-              const data = (await res.json()) as { error?: string };
-              if (!res.ok) {
-                setError(data.error || 'Kullanıcı adı veya şifre hatalı.');
-                return;
-              }
-              setPassword('');
-              onSuccess();
-            } catch {
-              setError('Giriş yapılamadı. Lütfen tekrar deneyin.');
-            } finally {
-              setPending(false);
-            }
-          }}
-        >
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Kullanıcı adı</span>
-            <input
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Şifre</span>
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-            />
-          </label>
-          {error ? <p className="text-sm text-red-700">{error}</p> : null}
-          <div className="flex flex-wrap gap-2 pt-1">
-            <button type="submit" className="btn btn-primary min-h-11" disabled={pending}>
-              {pending ? 'Doğrulanıyor…' : 'Giriş / Devam'}
-            </button>
-            <button type="button" className="btn btn-secondary min-h-11" onClick={onClose}>
-              Vazgeç
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body
-  );
-}
-
 function paymentBadge(state: string | undefined) {
   if (state === 'download_ready') {
     return <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">İndirilebilir</span>;
@@ -220,7 +89,6 @@ export function DownloadTable() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [platform, setPlatform] = useState<DownloadPlatformFilter>('all');
-  const [adminOpen, setAdminOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [adminAuthed, setAdminAuthed] = useState(false);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -292,20 +160,9 @@ export function DownloadTable() {
     });
   }, [packages, query, platform]);
 
-  const beginUpload = async (opener: HTMLElement | null) => {
+  const beginUpload = (opener: HTMLElement | null) => {
     triggerRef.current = opener;
-    if (adminAuthed) {
-      setUploadOpen(true);
-      return;
-    }
-    const session = await fetch('/api/downloads/admin/session', { cache: 'no-store' });
-    const json = (await session.json()) as { authenticated?: boolean };
-    if (json.authenticated) {
-      setAdminAuthed(true);
-      setUploadOpen(true);
-      return;
-    }
-    setAdminOpen(true);
+    setUploadOpen(true);
   };
 
   return (
@@ -324,7 +181,7 @@ export function DownloadTable() {
         <button
           type="button"
           className="btn btn-secondary min-h-11 shrink-0 gap-2"
-          onClick={(e) => void beginUpload(e.currentTarget)}
+          onClick={(e) => beginUpload(e.currentTarget)}
         >
           <Upload size={16} aria-hidden />
           Yükle
@@ -342,7 +199,7 @@ export function DownloadTable() {
         </div>
       ) : packages.length === 0 ? (
         <div className="mt-8">
-          <EmptyDownloadState onUpload={() => void beginUpload(null)} />
+          <EmptyDownloadState onUpload={() => beginUpload(null)} />
         </div>
       ) : (
         <>
@@ -432,7 +289,7 @@ export function DownloadTable() {
                             type="button"
                             className="btn btn-secondary min-h-11 gap-1.5 px-3"
                             aria-label={`${pkg.name} için dosya yükle`}
-                            onClick={(e) => void beginUpload(e.currentTarget)}
+                            onClick={(e) => beginUpload(e.currentTarget)}
                           >
                             <Upload size={14} aria-hidden />
                             Yükle
@@ -482,7 +339,7 @@ export function DownloadTable() {
                       <div><dt className="text-[11px] text-muted">Ödeme</dt><dd className="mt-0.5">{paymentBadge(access?.state)}</dd></div>
                     </dl>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <button type="button" className="btn btn-secondary min-h-11 gap-1.5" onClick={(e) => void beginUpload(e.currentTarget)}>
+                      <button type="button" className="btn btn-secondary min-h-11 gap-1.5" onClick={(e) => beginUpload(e.currentTarget)}>
                         <Upload size={14} aria-hidden />
                         Yükle
                       </button>
@@ -496,20 +353,12 @@ export function DownloadTable() {
         </>
       )}
 
-      <AdminLoginModal
-        open={adminOpen}
-        onClose={() => setAdminOpen(false)}
-        returnFocusRef={triggerRef}
-        onSuccess={() => {
-          setAdminAuthed(true);
-          setAdminOpen(false);
-          setUploadOpen(true);
-        }}
-      />
       <AdminUploadModal
         open={uploadOpen}
         onClose={() => setUploadOpen(false)}
         returnFocusRef={triggerRef}
+        initiallyAuthenticated={adminAuthed}
+        onAuthenticated={() => setAdminAuthed(true)}
         onUploaded={() => void refresh()}
       />
     </div>

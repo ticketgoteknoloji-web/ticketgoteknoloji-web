@@ -4,16 +4,17 @@ import { paymentEnv } from '@/lib/payments/config';
 import { rateLimit } from '@/lib/payments/security';
 import {
   DOWNLOAD_ACCESS_COOKIE,
+  DOWNLOAD_ADMIN_CODE_MAX_LENGTH,
   DOWNLOAD_ADMIN_COOKIE,
   downloadSessionSecretCandidates,
-  expectedAdminEmail,
-  expectedAdminPasswordHash,
-  normalizeAdminEmail,
-  verifyDownloadAdminPassword,
+  expectedAdminCodeHash,
+  verifyDownloadAdminCode,
 } from '@/lib/downloads/config';
 
 const ADMIN_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 const ACCESS_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+export const DOWNLOAD_ADMIN_ROLE = 'download-admin' as const;
 
 function signingSecret(): string {
   const secret = downloadSessionSecretCandidates()[0];
@@ -38,27 +39,29 @@ function safeEqualHex(a: string, b: string): boolean {
 }
 
 export type AdminSession = {
-  email: string;
+  role: typeof DOWNLOAD_ADMIN_ROLE;
   exp: number;
 };
 
-export function authenticateAdminCredentials(email: string, password: string): boolean {
-  const expectedEmail = expectedAdminEmail();
-  const expectedHash = expectedAdminPasswordHash();
-  if (!expectedEmail || !expectedHash) return false;
-  if (normalizeAdminEmail(email) !== expectedEmail) return false;
-  return verifyDownloadAdminPassword(password, expectedHash);
+/** Fail-closed when hash missing or code invalid. Never logs the code. */
+export function authenticateAdminCode(code: string): boolean {
+  if (typeof code !== 'string') return false;
+  if (!code || code.length > DOWNLOAD_ADMIN_CODE_MAX_LENGTH) return false;
+  const expectedHash = expectedAdminCodeHash();
+  if (!expectedHash) return false;
+  return verifyDownloadAdminCode(code, expectedHash);
 }
 
 export function adminLoginAllowed(ip: string): boolean {
   return rateLimit(`download-admin-login:${ip}`, 5, 15 * 60_000);
 }
 
-export function encodeAdminSession(email: string): string {
+export function encodeAdminSession(): string {
   const exp = Date.now() + ADMIN_TTL_MS;
-  const body = Buffer.from(JSON.stringify({ email: normalizeAdminEmail(email), exp }), 'utf8').toString(
-    'base64url'
-  );
+  const body = Buffer.from(
+    JSON.stringify({ role: DOWNLOAD_ADMIN_ROLE, exp } satisfies AdminSession),
+    'utf8'
+  ).toString('base64url');
   return `${body}.${sign(body)}`;
 }
 
@@ -67,10 +70,10 @@ export function decodeAdminSession(raw: string | undefined | null): AdminSession
   const [body, sig] = raw.split('.');
   if (!body || !sig || !safeEqualHex(sign(body), sig)) return null;
   try {
-    const parsed = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as AdminSession;
-    if (!parsed?.email || typeof parsed.exp !== 'number') return null;
+    const parsed = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as Partial<AdminSession>;
+    if (parsed?.role !== DOWNLOAD_ADMIN_ROLE || typeof parsed.exp !== 'number') return null;
     if (parsed.exp < Date.now()) return null;
-    return { email: normalizeAdminEmail(parsed.email), exp: parsed.exp };
+    return { role: DOWNLOAD_ADMIN_ROLE, exp: parsed.exp };
   } catch {
     return null;
   }

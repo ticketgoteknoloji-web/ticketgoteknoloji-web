@@ -113,21 +113,21 @@ export function sha256Buffer(buf: Buffer): string {
   return createHash('sha256').update(buf).digest('hex');
 }
 
-/** scrypt$salt$hexhash — password never stored in plaintext. */
-export function hashDownloadAdminPassword(password: string): string {
+/** scrypt$salt$hexhash — admin code never stored in plaintext. */
+export function hashDownloadAdminCode(code: string): string {
   const salt = randomBytes(16).toString('hex');
-  const hash = scryptSync(password, salt, 64).toString('hex');
+  const hash = scryptSync(code, salt, 64).toString('hex');
   return `scrypt$${salt}$${hash}`;
 }
 
-export function verifyDownloadAdminPassword(password: string, stored: string): boolean {
-  if (!password || !stored) return false;
+export function verifyDownloadAdminCode(code: string, stored: string): boolean {
+  if (!code || !stored) return false;
   const parts = stored.split('$');
   if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
   const [, salt, expectedHex] = parts;
   if (!salt || !expectedHex) return false;
   try {
-    const actual = scryptSync(password, salt, 64);
+    const actual = scryptSync(code, salt, 64);
     const expected = Buffer.from(expectedHex, 'hex');
     if (actual.length !== expected.length) return false;
     return timingSafeEqual(actual, expected);
@@ -136,17 +136,11 @@ export function verifyDownloadAdminPassword(password: string, stored: string): b
   }
 }
 
-export function normalizeAdminEmail(email: string): string {
-  return email.trim().toLowerCase();
+export function expectedAdminCodeHash(): string {
+  return (process.env.DOWNLOAD_ADMIN_CODE_HASH ?? '').trim();
 }
 
-export function expectedAdminEmail(): string {
-  return normalizeAdminEmail(process.env.DOWNLOAD_ADMIN_EMAIL ?? '');
-}
-
-export function expectedAdminPasswordHash(): string {
-  return (process.env.DOWNLOAD_ADMIN_PASSWORD_HASH ?? '').trim();
-}
+export const DOWNLOAD_ADMIN_CODE_MAX_LENGTH = 256;
 
 export function downloadSessionSecretCandidates(): string[] {
   return [

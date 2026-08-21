@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   const published = publishedRaw !== 'false' && publishedRaw !== '0';
 
   const result = await persistAdminUpload({
-    adminEmail: session.email,
+    adminEmail: 'download-admin',
     name: String(form.get('name') ?? ''),
     description: String(form.get('description') ?? ''),
     platforms: [
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     productId: result.package.productId,
     fileName: result.package.originalFileName,
     fileSize: result.package.fileSizeBytes,
-    admin: session.email,
+    admin: session.role,
   });
 
   return NextResponse.json({

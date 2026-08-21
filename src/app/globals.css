@@ -466,7 +466,8 @@
     display: flex;
     flex-direction: column;
     width: min(760px, calc(100vw - 32px));
-    max-height: calc(100dvh - 32px);
+    max-height: calc(100vh - 48px);
+    max-height: calc(100dvh - 48px);
     margin: auto;
     overflow: hidden;
     border-radius: var(--radius-card);
@@ -553,7 +554,8 @@
 
     .upload-modal-panel {
       width: calc(100vw - 16px);
-      max-height: calc(100dvh - 16px);
+      max-height: calc(100vh - 24px);
+      max-height: calc(100dvh - 24px);
     }
 
     .upload-modal-footer {
