@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -126,26 +128,79 @@ test('private storage is not under public', () => {
   assert.equal(existsSync(join(root, 'public/downloads')), false);
 });
 
-test('seeded safe-upload guide is a real published free package', () => {
-  const dbPath = join(root, '.data', 'downloads.json');
-  assert.equal(existsSync(dbPath), true);
-  const db = JSON.parse(readFileSync(dbPath, 'utf8'));
-  const matches = (db.packages || []).filter((p) => p.originalFileName === 'guvenli-yukleme-talimatlari.txt');
-  assert.equal(matches.length, 1, 'expected exactly one real package row');
-  const pkg = matches[0];
-  assert.ok(pkg, 'expected real package metadata');
-  assert.equal(pkg.name, 'Güvenli Yükleme Talimatları');
-  assert.equal(pkg.priceUsd, 0);
-  assert.equal(pkg.published, true);
-  assert.equal(pkg.fileType, 'TXT');
-  assert.match(pkg.checksumSha256, /^[a-f0-9]{64}$/);
-  assert.ok(pkg.fileSizeBytes > 0);
-  assert.deepEqual(pkg.platforms, ['windows', 'macos', 'android', 'ios']);
-  assert.match(pkg.platform, /Windows/);
-  assert.match(pkg.platform, /macOS/);
-  assert.match(pkg.platform, /Android/);
-  assert.match(pkg.platform, /iOS/);
-  assert.doesNotMatch(JSON.stringify(pkg), /\/srv\//);
+/**
+ * Validates free multi-platform package metadata shape using an isolated temp DB.
+ * Must NOT require repository/production `.data/downloads.json` to exist.
+ */
+test('isolated free package metadata fixture validates expected shape', () => {
+  assert.match(gitignore, /^\.data$/m);
+  assert.match(configSrc, /DOWNLOAD_STORAGE_DIR/);
+  assert.match(configSrc, /downloads\.json/);
+  assert.match(storeSrc, /emptyDb\(\)/);
+  assert.match(storeSrc, /catch \{\s*return emptyDb\(\);/s);
+
+  const content = 'TicketGo Teknoloji — isolated test fixture only.\n';
+  const checksum = createHash('sha256').update(content).digest('hex');
+  const storedFileName = `${randomBytes(8).toString('hex')}.txt`;
+  const fixturePkg = {
+    id: 'dl-test-fixture',
+    productId: 'download-dl-test-fixture',
+    name: 'Güvenli Yükleme Talimatları',
+    description: 'Isolated test fixture — not a production catalog entry.',
+    platforms: ['windows', 'macos', 'android', 'ios'],
+    platform: 'Windows · macOS · Android · iOS',
+    version: 'v1.0.0',
+    architecture: 'Universal',
+    fileType: 'TXT',
+    mimeType: 'text/plain',
+    fileSize: '1 B',
+    fileSizeBytes: Buffer.byteLength(content),
+    priceUsd: 0,
+    currency: 'USD',
+    storedFileName,
+    originalFileName: 'guvenli-yukleme-talimatlari.txt',
+    storageRelativePath: storedFileName,
+    checksumSha256: checksum,
+    uploadedAt: new Date().toISOString(),
+    uploadedBy: 'test@fixture.local',
+    published: true,
+    status: 'published',
+  };
+
+  const tempRoot = mkdtempSync(join(tmpdir(), 'tg-dl-meta-'));
+  const fixtureDbPath = join(tempRoot, 'downloads.json');
+  try {
+    writeFileSync(
+      fixtureDbPath,
+      JSON.stringify({ packages: [fixturePkg], entitlements: [], audit: [] }, null, 2),
+      'utf8'
+    );
+
+    // Isolated path — never the repo/production metadata file.
+    assert.notEqual(fixtureDbPath, join(root, '.data', 'downloads.json'));
+    assert.ok(!fixtureDbPath.startsWith(join(root, '.data')));
+
+    const db = JSON.parse(readFileSync(fixtureDbPath, 'utf8'));
+    const matches = (db.packages || []).filter((p) => p.originalFileName === 'guvenli-yukleme-talimatlari.txt');
+    assert.equal(matches.length, 1);
+    const pkg = matches[0];
+    assert.equal(pkg.name, 'Güvenli Yükleme Talimatları');
+    assert.equal(pkg.priceUsd, 0);
+    assert.equal(pkg.published, true);
+    assert.equal(pkg.fileType, 'TXT');
+    assert.match(pkg.checksumSha256, /^[a-f0-9]{64}$/);
+    assert.ok(pkg.fileSizeBytes > 0);
+    assert.deepEqual(pkg.platforms, ['windows', 'macos', 'android', 'ios']);
+    assert.match(pkg.platform, /Windows/);
+    assert.match(pkg.platform, /macOS/);
+    assert.match(pkg.platform, /Android/);
+    assert.match(pkg.platform, /iOS/);
+    assert.doesNotMatch(JSON.stringify(pkg), /\/srv\//);
+    assert.equal(typeof pkg.storageRelativePath, 'string');
+    assert.doesNotMatch(pkg.storageRelativePath, /\.\.|\/|\\/);
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test('platform filter helpers support multi-platform packages', () => {
