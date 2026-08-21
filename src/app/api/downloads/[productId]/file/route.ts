@@ -7,6 +7,7 @@ import {
   appendDownloadAudit,
   findValidEntitlement,
   getStoredPackageByProductId,
+  revokeDownloadEntitlementsForOrder,
 } from '@/lib/downloads/store';
 import { getOrderById } from '@/lib/payments/orders';
 import { clientIp, rateLimit } from '@/lib/payments/security';
@@ -24,7 +25,7 @@ export async function GET(request: Request, { params }: Params) {
 
   const { productId: rawId } = await params;
   const productId = decodeURIComponent(rawId || '').trim();
-  if (!productId || productId.includes('..') || productId.includes('/')) {
+  if (!productId || productId.includes('..') || productId.includes('/') || productId.includes('\\')) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
@@ -47,9 +48,11 @@ export async function GET(request: Request, { params }: Params) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Authorization is cookie/entitlement based — never trust client paid flags.
+    // Optional ?token= is only accepted if it matches a stored entitlement (same as cookie tokens).
     const tokens = await readAccessTokens();
     const urlToken = new URL(request.url).searchParams.get('token');
-    const statusTokens = urlToken ? Array.from(new Set([...tokens, urlToken])) : tokens;
+    const statusTokens = urlToken ? Array.from(new Set([...tokens, urlToken.trim()])) : tokens;
 
     const entitlement = await findValidEntitlement({ productId: pkg.productId, statusTokens });
     if (!entitlement) {
@@ -58,7 +61,15 @@ export async function GET(request: Request, { params }: Params) {
     }
 
     const order = await getOrderById(entitlement.orderId);
-    if (!order || order.status !== 'paid' || order.productId !== pkg.productId) {
+    if (!order || order.productId !== pkg.productId) {
+      await appendDownloadAudit({ event: 'download_denied', productId: pkg.productId });
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (order.status !== 'paid') {
+      if (order.status === 'refunded' || order.status === 'cancelled') {
+        await revokeDownloadEntitlementsForOrder(order.id);
+      }
       await appendDownloadAudit({ event: 'download_denied', productId: pkg.productId });
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -67,6 +78,7 @@ export async function GET(request: Request, { params }: Params) {
   const nodeStream = createReadStream(filePath);
   const webStream = Readable.toWeb(nodeStream) as unknown as ReadableStream;
   const dispositionName = pkg.originalFileName.replace(/"/g, '');
+  const contentType = (pkg.mimeType || 'application/octet-stream').split(';')[0]?.trim() || 'application/octet-stream';
 
   await appendDownloadAudit({
     event: 'download_success',
@@ -78,7 +90,7 @@ export async function GET(request: Request, { params }: Params) {
   return new NextResponse(webStream, {
     status: 200,
     headers: {
-      'Content-Type': 'application/octet-stream',
+      'Content-Type': contentType,
       'Content-Disposition': `attachment; filename="${dispositionName}"`,
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',

@@ -77,7 +77,7 @@ export function validateUploadFile(input: {
 }): { ok: true; ext: string; fileTypeLabel: string } | { ok: false; error: string } {
   if (input.sizeBytes <= 0) return { ok: false, error: 'Dosya boş olamaz.' };
   if (input.sizeBytes > maxDownloadBytes()) {
-    return { ok: false, error: `Dosya boyutu limiti aşıldı (maks. ${Math.round(maxDownloadBytes() / (1024 * 1024))} MB).` };
+    return { ok: false, error: 'Dosya izin verilen maksimum boyutu aşıyor.' };
   }
   const ext = extensionOf(input.originalName);
   if (!ext) return { ok: false, error: 'Bu dosya türüne izin verilmiyor.' };

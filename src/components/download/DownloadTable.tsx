@@ -4,9 +4,9 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { Download, Search, Upload, X } from 'lucide-react';
 import { BuyButton } from '@/components/BuyButton';
+import { AdminUploadModal } from '@/components/download/AdminUploadModal';
 import {
   DOWNLOAD_PAGE_SIZE,
-  DOWNLOAD_PLATFORM_IDS,
   DOWNLOAD_PLATFORM_LABELS,
   DOWNLOAD_TABLE_FILTERS,
   formatShortDate,
@@ -20,10 +20,12 @@ import { BRAND_LEGAL_NAME } from '@/lib/site';
 import { formatMoney } from '@/lib/money';
 
 type AccessInfo = {
+  productId?: string;
   state: string;
   canDownload: boolean;
   label?: string;
   paymentUrl?: string;
+  free?: boolean;
 };
 
 function PlatformBadges({ platforms }: { platforms: readonly DownloadPlatformId[] }) {
@@ -192,172 +194,23 @@ function AdminLoginModal({
   );
 }
 
-function AdminUploadModal({
-  open,
-  onClose,
-  onUploaded,
-  returnFocusRef,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onUploaded: () => void;
-  returnFocusRef: React.MutableRefObject<HTMLElement | null>;
-}) {
-  const titleId = useId();
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    return acquireScrollLock();
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      const t = window.setTimeout(() => closeRef.current?.focus(), 60);
-      return () => window.clearTimeout(t);
-    }
-    returnFocusRef.current?.focus();
-  }, [open, returnFocusRef]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
-  if (!open || typeof document === 'undefined') return null;
-
-  return createPortal(
-    <div
-      className="site-modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="site-modal-panel max-w-lg">
-        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">{BRAND_LEGAL_NAME}</p>
-            <h2 id={titleId} className="mt-1 text-base font-semibold text-ink">
-              Yazılım Paketi Yükle
-            </h2>
-          </div>
-          <button ref={closeRef} type="button" aria-label="Kapat" className="btn btn-ghost h-9 w-9 p-0" onClick={onClose}>
-            <X size={18} aria-hidden />
-          </button>
-        </div>
-        <form
-          className="space-y-3 px-6 py-5"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            const form = event.currentTarget;
-            const data = new FormData(form);
-            setPending(true);
-            setError(null);
-            try {
-              const res = await fetch('/api/downloads/admin/upload', { method: 'POST', body: data });
-              const json = (await res.json()) as { error?: string };
-              if (!res.ok) {
-                setError(json.error || 'Yükleme başarısız.');
-                return;
-              }
-              form.reset();
-              onUploaded();
-              onClose();
-            } catch {
-              setError('Yükleme başarısız.');
-            } finally {
-              setPending(false);
-            }
-          }}
-        >
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Yazılım adı</span>
-            <input name="name" required maxLength={120} className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm" />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Kısa açıklama</span>
-            <textarea name="description" required maxLength={500} rows={3} className="mt-1.5 w-full rounded-xl border border-line px-3 py-2 text-sm" />
-          </label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <fieldset className="block text-sm sm:col-span-2">
-              <legend className="font-medium text-ink">Platform</legend>
-              <p className="mt-1 text-xs text-muted">Birden fazla seçilebilir; aynı dosya tek kayıt olarak kalır.</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {DOWNLOAD_PLATFORM_IDS.map((id) => (
-                  <label
-                    key={id}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-medium text-ink"
-                  >
-                    <input type="checkbox" name="platforms" value={id} className="h-4 w-4 rounded border-line text-brand-600" />
-                    {DOWNLOAD_PLATFORM_LABELS[id]}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <label className="block text-sm">
-              <span className="font-medium text-ink">Sürüm</span>
-              <input name="version" required maxLength={40} placeholder="v1.0.0" className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm" />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-ink">Mimari</span>
-              <input name="architecture" defaultValue="Universal" maxLength={40} className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm" />
-            </label>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="font-medium text-ink">Fiyat (USD)</span>
-              <input name="priceUsd" type="number" min={0} step="0.01" placeholder="Boş = satışa kapalı" className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm" />
-            </label>
-          </div>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Dosya</span>
-            <input
-              name="file"
-              type="file"
-              required
-              accept=".txt,.zip,.dmg,.pkg,.exe,.msi,.apk"
-              className="mt-1.5 block w-full text-sm"
-            />
-          </label>
-          {error ? <p className="text-sm text-red-700">{error}</p> : null}
-          <div className="flex flex-wrap gap-2 pt-1">
-            <button type="submit" className="btn btn-primary min-h-11" disabled={pending}>
-              {pending ? 'Kaydediliyor…' : 'Kaydet'}
-            </button>
-            <button type="button" className="btn btn-secondary min-h-11" onClick={onClose}>
-              Vazgeç
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body
-  );
-}
-
 function paymentBadge(state: string | undefined) {
   if (state === 'download_ready') {
-    return <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">Ödendi</span>;
+    return <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">İndirilebilir</span>;
   }
   if (state === 'payment_pending') {
-    return <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900">Bekliyor</span>;
+    return <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900">Doğrulanıyor...</span>;
   }
-  if (state === 'no_file') {
-    return <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">Dosya yok</span>;
+  if (state === 'no_file' || state === 'unpublished') {
+    return <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">Henüz yayınlanmadı</span>;
   }
   if (state === 'price_undefined') {
     return <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">Fiyat yok</span>;
   }
-  return <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">Satın alınabilir</span>;
+  if (state === 'payment_failed') {
+    return <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-800">Ödeme başarısız</span>;
+  }
+  return <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">Satın Al</span>;
 }
 
 export function DownloadTable() {
@@ -586,7 +439,7 @@ export function DownloadTable() {
                           </button>
                         </td>
                         <td className="px-4 py-4 align-top text-right">
-                          <DownloadAction pkg={pkg} access={access} />
+                          <DownloadAction pkg={pkg} access={access} accessLoading={loading} />
                         </td>
                       </tr>
                     );
@@ -633,7 +486,7 @@ export function DownloadTable() {
                         <Upload size={14} aria-hidden />
                         Yükle
                       </button>
-                      <DownloadAction pkg={pkg} access={access} />
+                      <DownloadAction pkg={pkg} access={access} accessLoading={loading} />
                     </div>
                   </article>
                 );
@@ -663,15 +516,33 @@ export function DownloadTable() {
   );
 }
 
-function DownloadAction({ pkg, access }: { pkg: PublicDownloadPackage; access?: AccessInfo }) {
-  if (!pkg.fileAvailable || access?.state === 'no_file') {
+function DownloadAction({
+  pkg,
+  access,
+  accessLoading,
+}: {
+  pkg: PublicDownloadPackage;
+  access?: AccessInfo;
+  accessLoading?: boolean;
+}) {
+  if (accessLoading && !access) {
     return (
-      <button type="button" className="btn btn-primary min-h-11 gap-1.5 px-4" disabled aria-disabled="true">
-        Dosya kullanılamıyor
+      <button type="button" className="btn btn-secondary min-h-11 px-4" disabled aria-disabled="true">
+        Doğrulanıyor...
       </button>
     );
   }
-  if (access?.canDownload) {
+
+  if (!pkg.fileAvailable || access?.state === 'no_file' || access?.state === 'unpublished') {
+    return (
+      <button type="button" className="btn btn-secondary min-h-11 gap-1.5 px-4" disabled aria-disabled="true">
+        Henüz yayınlanmadı
+      </button>
+    );
+  }
+
+  // Active download only when backend says canDownload — never invent a file URL otherwise.
+  if (access?.canDownload === true) {
     return (
       <a
         href={`/api/downloads/${encodeURIComponent(pkg.productId)}/file`}
@@ -683,32 +554,36 @@ function DownloadAction({ pkg, access }: { pkg: PublicDownloadPackage; access?: 
       </a>
     );
   }
+
   if (access?.state === 'payment_pending') {
     return (
-      <button type="button" className="btn btn-primary min-h-11 px-4" disabled aria-disabled="true">
-        Ödeme Bekleniyor
+      <button type="button" className="btn btn-secondary min-h-11 px-4" disabled aria-disabled="true">
+        Doğrulanıyor...
       </button>
     );
   }
-  if (access?.paymentUrl || access?.state === 'purchase_required' || access?.state === 'payment_failed') {
-    const href = access.paymentUrl || `/payment?productId=${encodeURIComponent(pkg.productId)}&period=once`;
-    return (
-      <BuyButton href={href} className="btn btn-primary min-h-11 gap-1.5 px-4">
-        <Download size={15} aria-hidden />
-        {access.label || 'Satın Al'}
-      </BuyButton>
-    );
-  }
+
   if (access?.state === 'price_undefined') {
     return (
-      <button type="button" className="btn btn-primary min-h-11 px-4" disabled aria-disabled="true">
+      <button type="button" className="btn btn-secondary min-h-11 px-4" disabled aria-disabled="true">
         Fiyat tanımlanmadı
       </button>
     );
   }
+
+  if (access?.paymentUrl || access?.state === 'purchase_required' || access?.state === 'payment_failed') {
+    const href = access.paymentUrl || `/payment?productId=${encodeURIComponent(pkg.productId)}&period=once`;
+    return (
+      <BuyButton href={href} className="btn btn-primary min-h-11 gap-1.5 px-4">
+        {access.label || 'Satın Al'}
+      </BuyButton>
+    );
+  }
+
+  // Locked: no href to file endpoint in the DOM.
   return (
-    <button type="button" className="btn btn-primary min-h-11 px-4" disabled aria-disabled="true">
-      İndir
+    <button type="button" className="btn btn-secondary min-h-11 px-4" disabled aria-disabled="true" title="Ödeme gerekli">
+      Satın Al
     </button>
   );
 }

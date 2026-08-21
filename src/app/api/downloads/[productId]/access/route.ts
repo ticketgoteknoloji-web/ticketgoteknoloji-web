@@ -4,6 +4,7 @@ import {
   absoluteStoragePath,
   findValidEntitlement,
   getStoredPackageByProductId,
+  revokeDownloadEntitlementsForOrder,
 } from '@/lib/downloads/store';
 import type { DownloadAccessState } from '@/lib/downloads/types';
 import { getOrderById } from '@/lib/payments/orders';
@@ -14,6 +15,17 @@ export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ productId: string }> };
 
+function jsonAccess(body: {
+  productId: string;
+  state: DownloadAccessState;
+  canDownload: boolean;
+  label?: string;
+  paymentUrl?: string;
+  free?: boolean;
+}) {
+  return NextResponse.json(body);
+}
+
 export async function GET(request: Request, { params }: Params) {
   const ip = clientIp(request.headers);
   if (!rateLimit(`download-access:${ip}`, 60, 60_000)) {
@@ -22,41 +34,49 @@ export async function GET(request: Request, { params }: Params) {
 
   const { productId: rawId } = await params;
   const productId = decodeURIComponent(rawId || '').trim();
+  if (!productId || productId.includes('..') || productId.includes('/')) {
+    return jsonAccess({ productId: productId || '', state: 'no_file', canDownload: false, label: 'Henüz yayınlanmadı' });
+  }
+
   const pkg = await getStoredPackageByProductId(productId);
   if (!pkg) {
-    return NextResponse.json({ state: 'no_file' satisfies DownloadAccessState, canDownload: false });
+    return jsonAccess({ productId, state: 'no_file', canDownload: false, label: 'Henüz yayınlanmadı' });
   }
 
   if (pkg.published === false) {
-    return NextResponse.json({
-      state: 'unpublished' satisfies DownloadAccessState,
+    return jsonAccess({
+      productId: pkg.productId,
+      state: 'unpublished',
       canDownload: false,
-      label: 'Yayında değil',
+      label: 'Henüz yayınlanmadı',
     });
   }
 
   const filePath = await absoluteStoragePath(pkg);
   if (!filePath) {
-    return NextResponse.json({
-      state: 'no_file' satisfies DownloadAccessState,
+    return jsonAccess({
+      productId: pkg.productId,
+      state: 'no_file',
       canDownload: false,
-      label: 'Dosya kullanılamıyor',
+      label: 'Henüz yayınlanmadı',
     });
   }
 
-  // Free package (explicit 0) — no payment required; still served via secure endpoint.
+  // Explicit 0 = free. null = not for sale (do not open download).
   if (pkg.priceUsd === 0) {
-    return NextResponse.json({
-      state: 'download_ready' satisfies DownloadAccessState,
+    return jsonAccess({
+      productId: pkg.productId,
+      state: 'download_ready',
       canDownload: true,
       label: 'İndir',
       free: true,
     });
   }
 
-  if (pkg.priceUsd == null) {
-    return NextResponse.json({
-      state: 'price_undefined' satisfies DownloadAccessState,
+  if (pkg.priceUsd == null || pkg.priceUsd < 0) {
+    return jsonAccess({
+      productId: pkg.productId,
+      state: 'price_undefined',
       canDownload: false,
       label: 'Fiyat tanımlanmadı',
     });
@@ -66,31 +86,44 @@ export async function GET(request: Request, { params }: Params) {
   const entitlement = await findValidEntitlement({ productId: pkg.productId, statusTokens: tokens });
   if (entitlement) {
     const order = await getOrderById(entitlement.orderId);
-    if (order?.status === 'paid') {
-      return NextResponse.json({
-        state: 'download_ready' satisfies DownloadAccessState,
+    if (order?.status === 'paid' && order.productId === pkg.productId) {
+      return jsonAccess({
+        productId: pkg.productId,
+        state: 'download_ready',
         canDownload: true,
         label: 'İndir',
       });
     }
-    if (order?.status === 'awaiting_payment' || order?.status === 'processing' || order?.status === 'pending') {
-      return NextResponse.json({
-        state: 'payment_pending' satisfies DownloadAccessState,
+
+    if (order?.status === 'refunded' || order?.status === 'cancelled' || order?.status === 'failed') {
+      await revokeDownloadEntitlementsForOrder(entitlement.orderId);
+      return jsonAccess({
+        productId: pkg.productId,
+        state: order.status === 'failed' ? 'payment_failed' : 'purchase_required',
         canDownload: false,
-        label: 'Ödeme Bekleniyor',
+        label: order.status === 'failed' ? 'Ödemeyi Tekrarla' : 'Satın Al',
+        paymentUrl: `/payment?productId=${encodeURIComponent(pkg.productId)}&period=once`,
       });
     }
-    if (order?.status === 'failed' || order?.status === 'cancelled') {
-      return NextResponse.json({
-        state: 'payment_failed' satisfies DownloadAccessState,
+
+    if (
+      order?.status === 'awaiting_payment' ||
+      order?.status === 'processing' ||
+      order?.status === 'pending' ||
+      order?.status === 'payment_started'
+    ) {
+      return jsonAccess({
+        productId: pkg.productId,
+        state: 'payment_pending',
         canDownload: false,
-        label: 'Ödemeyi Tekrarla',
+        label: 'Doğrulanıyor...',
       });
     }
   }
 
-  return NextResponse.json({
-    state: 'purchase_required' satisfies DownloadAccessState,
+  return jsonAccess({
+    productId: pkg.productId,
+    state: 'purchase_required',
     canDownload: false,
     label: 'Satın Al',
     paymentUrl: `/payment?productId=${encodeURIComponent(pkg.productId)}&period=once`,

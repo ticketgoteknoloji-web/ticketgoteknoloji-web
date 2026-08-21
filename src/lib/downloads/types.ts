@@ -46,6 +46,7 @@ export type DownloadEntitlement = {
   paymentId: string | null;
   paymentStatus: 'paid';
   downloadGranted: true;
+  /** active until refund/chargeback/cancel — then revoked */
   status: 'active' | 'revoked';
   statusToken: string;
   customerEmail: string;

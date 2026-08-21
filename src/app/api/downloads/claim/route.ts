@@ -22,12 +22,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
-  let body: { orderId?: string; token?: string };
+  let body: { orderId?: string; token?: string; paid?: boolean };
   try {
-    body = (await request.json()) as { orderId?: string; token?: string };
+    body = (await request.json()) as { orderId?: string; token?: string; paid?: boolean };
   } catch {
     return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 400 });
   }
+
+  // Ignore any client-supplied paid flag entirely.
+  void body.paid;
 
   const orderId = typeof body.orderId === 'string' ? body.orderId.trim() : '';
   const token = typeof body.token === 'string' ? body.token.trim() : '';
@@ -40,15 +43,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Yetkisiz.' }, { status: 403 });
   }
   if (order.status !== 'paid') {
-    return NextResponse.json({ error: 'Ödeme doğrulanmadı.' }, { status: 403 });
+    return NextResponse.json(
+      {
+        error: 'Ödeme doğrulanmadı.',
+        status: order.status,
+        canDownload: false,
+      },
+      { status: 403 }
+    );
   }
 
   const pkg = await getStoredPackageByProductId(order.productId);
-  if (!pkg) {
-    return NextResponse.json({ ok: true, downloadProduct: false });
+  if (!pkg || pkg.productId !== order.productId) {
+    return NextResponse.json({
+      ok: true,
+      downloadProduct: false,
+      canDownload: false,
+      productId: order.productId,
+    });
   }
 
-  await grantDownloadEntitlement({
+  const entitlement = await grantDownloadEntitlement({
     orderId: order.id,
     productId: order.productId,
     paymentId: order.paymentTransactionId ?? order.providerPaymentId,
@@ -56,9 +71,20 @@ export async function POST(request: Request) {
     customerEmail: order.customerEmail,
   });
 
+  if (!entitlement) {
+    return NextResponse.json({ error: 'İndirme yetkisi oluşturulamadı.' }, { status: 500 });
+  }
+
   const jar = await cookies();
   const next = mergeAccessTokens(jar.get(DOWNLOAD_ACCESS_COOKIE)?.value, order.statusToken);
-  const response = NextResponse.json({ ok: true, downloadProduct: true, productId: order.productId });
+  const response = NextResponse.json({
+    ok: true,
+    downloadProduct: true,
+    canDownload: true,
+    productId: order.productId,
+    entitlementId: entitlement.id,
+    grantedAt: entitlement.grantedAt,
+  });
   response.cookies.set(DOWNLOAD_ACCESS_COOKIE, next, {
     ...adminCookieOptions(30 * 24 * 60 * 60),
     sameSite: 'lax',
