@@ -7,6 +7,7 @@ out
 .env.development
 .env.development.local
 .env*.local
+.env.*.local
 .data
 .storage
 storage/downloads/*

@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BrandLogo } from '@/components/BrandLogo';
@@ -36,7 +36,7 @@ type PaymentCheckoutProps = {
   installments: number[];
 };
 
-export function PaymentCheckout({ quote, configured, cardPrograms, installments }: PaymentCheckoutProps) {
+export function PaymentCheckout({ quote, configured, cardPrograms }: PaymentCheckoutProps) {
   const idempotencyKey = useRef(
     typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
   );
@@ -57,6 +57,11 @@ export function PaymentCheckout({ quote, configured, cardPrograms, installments 
   const [company, setCompany] = useState('');
   const [taxOffice, setTaxOffice] = useState('');
   const [installment, setInstallment] = useState(1);
+  const [tamiInstallments, setTamiInstallments] = useState<Array<{ count: number; enabled: boolean }>>([
+    { count: 1, enabled: true },
+  ]);
+  const [installmentFallback, setInstallmentFallback] = useState(false);
+  const [installmentNotice, setInstallmentNotice] = useState<string | null>(null);
   const [cardHolder, setCardHolder] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
@@ -87,6 +92,64 @@ export function PaymentCheckout({ quote, configured, cardPrograms, installments 
   const cardOk = holderOk && panOk && expiryOk && cvvOk;
   const orderOk = Boolean(quote.productId) && quote.totalMinor > 0;
   const canPay = Boolean(customerValid && cardOk && legalAccepted && orderOk && !submitting && (tryTotal != null || !configured));
+  const offeredInstallments = tamiInstallments.filter((item) => item.enabled && item.count >= 1);
+  const installmentChoices = offeredInstallments.length ? offeredInstallments : [{ count: 1, enabled: true }];
+  const tamiPointPanel = {
+    available: false,
+    amountLabel: null as string | null,
+    redeemable: false,
+  };
+
+  useEffect(() => {
+    const bin = digitsOnly(cardNumber).slice(0, 6);
+    if (bin.length < 6) {
+      setTamiInstallments([{ count: 1, enabled: true }]);
+      setInstallment(1);
+      setInstallmentFallback(false);
+      setInstallmentNotice(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/payments/tami/installments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ bin }),
+        });
+        const data = (await response.json()) as {
+          success?: boolean;
+          installments?: Array<{ count: number; enabled: boolean }>;
+          fallback?: boolean;
+          message?: string | null;
+        };
+        if (cancelled) return;
+        const next = (data.installments ?? [])
+          .filter((item) => item && item.enabled !== false && Number(item.count) >= 1)
+          .map((item) => ({ count: Number(item.count), enabled: true }));
+        const unique = Array.from(new Map(next.map((item) => [item.count, item])).values()).sort(
+          (a, b) => a.count - b.count
+        );
+        const options = unique.length ? unique : [{ count: 1, enabled: true }];
+        setTamiInstallments(options);
+        setInstallmentFallback(data.fallback === true || data.success === false);
+        setInstallmentNotice(data.fallback || data.success === false ? data.message || 'Taksit seçenekleri şu anda alınamadı. Ödeme tek çekim olarak devam eder.' : null);
+        setInstallment((current) => (options.some((item) => item.count === current) ? current : 1));
+      } catch {
+        if (cancelled) return;
+        setTamiInstallments([{ count: 1, enabled: true }]);
+        setInstallment(1);
+        setInstallmentFallback(true);
+        setInstallmentNotice('Taksit seçenekleri şu anda alınamadı. Ödeme tek çekim olarak devam eder.');
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [cardNumber]);
 
   const errors = {
     holder: !holderOk ? 'Kart üzerindeki ad soyad alanını doldurun.' : null,
@@ -470,17 +533,34 @@ export function PaymentCheckout({ quote, configured, cardPrograms, installments 
             </label>
           </div>
 
-          {installments.length > 1 ? (
+          {installmentChoices.length > 1 ? (
             <label className="mt-4 block text-sm">
               <span className="font-medium text-ink">Taksit seçenekleri</span>
               <select className="field-input mt-1" value={installment} onChange={(event) => setInstallment(Number(event.target.value))}>
-                {installments.map((count) => (
-                  <option key={count} value={count}>
-                    {count <= 1 ? 'Tek çekim' : `${count} Taksit`}
+                {installmentChoices.map((item) => (
+                  <option key={item.count} value={item.count}>
+                    {item.count <= 1 ? 'Tek çekim' : `${item.count} Taksit`}
                   </option>
                 ))}
               </select>
             </label>
+          ) : (
+            <p className="mt-4 text-sm text-muted">Tek çekim</p>
+          )}
+          {installmentFallback && installmentNotice ? (
+            <p className="mt-2 text-xs leading-5 text-muted">{installmentNotice}</p>
+          ) : null}
+
+          {tamiPointPanel.available && tamiPointPanel.amountLabel ? (
+            <div className="mt-4 rounded-xl border border-line bg-canvas px-3 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Kullanılabilir Puan</p>
+              <p className="mt-1 text-sm font-semibold text-ink">{tamiPointPanel.amountLabel}</p>
+              {tamiPointPanel.redeemable ? (
+                <button type="button" className="btn btn-secondary mt-3 w-full">
+                  Puan Kullan
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
           {enabledPrograms.length ? (

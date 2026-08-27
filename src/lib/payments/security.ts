@@ -60,7 +60,12 @@ export function sanitizeLogValue(value: unknown): unknown {
 export function paymentLog(event: string, fields: Record<string, unknown>): void {
   const safe: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(fields)) {
-    if (/secret|authorization|card|cvv|cvc|pan|password|storekey|store_key|userpass|apiKey|api_key|appSecret|threeds|htmlcontent|hasheddata/i.test(key) && key !== 'orderNumber') {
+    if (
+      /secret|authorization|card|cvv|cvc|pan|password|storekey|store_key|userpass|apiKey|api_key|appSecret|threeds|htmlcontent|hasheddata|securityhash|refundhash|installmenthash|pointhash|pointqueryhash|pg.?auth|tckn|identitynumber|\bkid\b|username/i.test(
+        key
+      ) &&
+      key !== 'orderNumber'
+    ) {
       safe[key] = '[redacted]';
     } else {
       safe[key] = sanitizeLogValue(value);

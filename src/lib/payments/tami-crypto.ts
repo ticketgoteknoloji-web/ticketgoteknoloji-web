@@ -11,10 +11,47 @@ export function base64UrlDecode(value: string): Buffer {
   return Buffer.from(base64 + pad, 'base64');
 }
 
-/** PG-Auth-Token: merchantId:merchantUser:base64(sha256(merchantId + merchantUser + secretKey)) */
-export function generatePgAuthToken(merchantId: string, merchantUser: string, secretKey: string): string {
-  const digest = createHash('sha256').update(`${merchantId}${merchantUser}${secretKey}`, 'utf8').digest();
-  return `${merchantId}:${merchantUser}:${digest.toString('base64')}`;
+/**
+ * Tami PG-Auth-Token (Java SHA-256 + Base64).
+ * Hash input is merchantNumber + terminalNumber + secretKey with no separators.
+ * Header value is merchantNumber:terminalNumber:base64Sha256.
+ */
+export function generatePgAuthToken(
+  merchantNumber: string,
+  terminalNumber: string,
+  secretKey: string
+): string {
+  const text = String(merchantNumber) + String(terminalNumber) + String(secretKey);
+  const hash = createHash('sha256').update(text, 'utf8').digest('base64');
+  return `${merchantNumber}:${terminalNumber}:${hash}`;
+}
+
+/**
+ * Tami installment-inquiry hash (Java SHA-256 + Base64).
+ * Hash input is merchantNumber + terminalNumber + secretKey with no separators.
+ * Not used for payment auth, 3-D Secure, callback, refund, or cancel.
+ */
+export function generateTamiInstallmentHash(
+  merchantNumber: string,
+  terminalNumber: string,
+  secretKey: string
+): string {
+  const text = String(merchantNumber) + String(terminalNumber) + String(secretKey);
+  return createHash('sha256').update(text, 'utf8').digest('base64');
+}
+
+/**
+ * Tami point-inquiry hash (Java SHA-256 + Base64).
+ * Hash input is merchantNumber + terminalNumber + secretKey with no separators.
+ * Used only by puan sorgulama — not payment auth, 3-D Secure, callback, refund, cancel, or installments.
+ */
+export function generateTamiPointQueryHash(
+  merchantNumber: string,
+  terminalNumber: string,
+  secretKey: string
+): string {
+  const text = String(merchantNumber) + String(terminalNumber) + String(secretKey);
+  return createHash('sha256').update(text, 'utf8').digest('base64');
 }
 
 export function parseKidAndK(password: string, username = ''): { kid: string; k: string } {
