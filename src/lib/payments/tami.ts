@@ -44,6 +44,29 @@ function expiryMonth(value: string): string {
   return digits(value).padStart(2, '0').slice(-2);
 }
 
+function present(value: unknown): 'present' | 'missing' {
+  if (value == null) return 'missing';
+  if (typeof value === 'string') return value.trim() ? 'present' : 'missing';
+  if (typeof value === 'object') return 'present';
+  return 'present';
+}
+
+function describeTamiPayloadShape(payload: Record<string, unknown>) {
+  return {
+    amount: typeof payload.amount,
+    orderId: typeof payload.orderId,
+    currency: typeof payload.currency,
+    installmentCount: typeof payload.installmentCount,
+    paymentGroup: typeof payload.paymentGroup,
+    card: present(payload.card),
+    buyer: present(payload.buyer),
+    billingAddress: present(payload.billingAddress),
+    shippingAddress: present(payload.shippingAddress),
+    callbackUrl: present(payload.callbackUrl),
+    securityHash: present(payload.securityHash),
+  };
+}
+
 function signedBody(body: Record<string, unknown>): Record<string, unknown> {
   const cfg = tamiConfig();
   const securityHash = generateJwkSignature(cfg.kid, cfg.k, body);
@@ -53,15 +76,17 @@ function signedBody(body: Record<string, unknown>): Record<string, unknown> {
 async function tamiPost(path: string, body: Record<string, unknown>): Promise<TamiJson> {
   const cfg = tamiConfig();
   const payload = signedBody(body);
+  const correlationId = `Correlation${randomBytes(16).toString('hex')}`;
   const response = await fetch(`${cfg.baseUrl}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
       'Accept-Language': 'tr',
+      // Kept at v3 until Tami SecurityHash Hesaplama v2 document confirms a different pair.
       'PG-Api-Version': 'v3',
       'PG-Auth-Token': generatePgAuthToken(cfg.merchantId, cfg.posId, cfg.secretKey),
-      correlationId: `Correlation${randomBytes(16).toString('hex')}`,
+      correlationId,
     },
     body: JSON.stringify(payload),
     cache: 'no-store',
@@ -74,13 +99,18 @@ async function tamiPost(path: string, body: Record<string, unknown>): Promise<Ta
     parsed = { success: false, errorMessage: 'tami_invalid_json' };
   }
   const data = isRecord(parsed) ? parsed : { success: false, errorMessage: 'tami_invalid_response' };
+  const responseCorrelationId = response.headers.get('correlationId') || asString(data.correlationId) || undefined;
   paymentLog('tami_http', {
     path,
     httpStatus: response.status,
     success: data.success,
     errorCode: data.errorCode,
+    errorMessage: asString(data.errorMessage) || undefined,
+    correlationId,
+    responseCorrelationId: responseCorrelationId && responseCorrelationId !== correlationId ? responseCorrelationId : undefined,
     paymentStatus: data.paymentStatus,
     orderStatus: data.orderStatus,
+    payloadShape: path === '/payment/auth' ? describeTamiPayloadShape(payload) : undefined,
   });
   return data;
 }

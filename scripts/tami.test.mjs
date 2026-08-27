@@ -150,7 +150,9 @@ test('Tami routes and provider exist; iyzico stays removed', () => {
   assert.match(checkout, /tamiPointPanel\.available/);
   assert.match(tami, /'PG-Api-Version': 'v3'/);
   assert.match(tami, /'PG-Auth-Token': generatePgAuthToken\(cfg\.merchantId, cfg\.posId, cfg\.secretKey\)/);
-  assert.match(tami, /correlationId: `Correlation\$\{randomBytes\(16\)\.toString\('hex'\)\}`/);
+  assert.match(tami, /const correlationId = `Correlation\$\{randomBytes\(16\)\.toString\('hex'\)\}`/);
+  assert.match(tami, /errorMessage: asString\(data\.errorMessage\)/);
+  assert.match(tami, /payloadShape: path === '\/payment\/auth' \? describeTamiPayloadShape\(payload\)/);
   assert.doesNotMatch(tami, /console\.(log|info|debug).*PG-Auth-Token/);
   assert.doesNotMatch(crypto, /console\.(log|info|debug)/);
   assert.match(config, /TAMI_ENV/);
