@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { startCheckout } from '@/lib/payments/service';
-import { publicBaseUrl, qnbpayConfig, tamiConfig } from '@/lib/payments/config';
+import { hasUsableTamiPosId, isUsableTamiCredential, publicBaseUrl, qnbpayConfig, tamiConfig } from '@/lib/payments/config';
 import { cardNumberValid, cvvValid, detectCardNetwork, digitsOnly, expiryValid } from '@/lib/payments/card-ui';
 import { clientIp, originAllowed, paymentLog, rateLimit, stripCardFields } from '@/lib/payments/security';
 import type { PaymentCard, PaymentCustomer, PaymentProviderId } from '@/lib/payments/types';
@@ -42,11 +42,13 @@ function missingQnbEnvNames(): string[] {
 function missingTamiEnvNames(): string[] {
   const missing: string[] = [];
   const need = (name: string, value: string | undefined) => {
-    if (!value?.trim()) missing.push(name);
+    if (!isUsableTamiCredential(value)) missing.push(name);
   };
   const cfg = tamiConfig();
   need('TAMI_MERCHANT_ID', process.env.TAMI_MERCHANT_ID);
-  need('TAMI_POS_ID', process.env.TAMI_POS_ID || process.env.TAMI_TERMINAL_ID);
+  if (!hasUsableTamiPosId(process.env.TAMI_POS_ID || process.env.TAMI_TERMINAL_ID, process.env.TAMI_MERCHANT_ID)) {
+    missing.push('TAMI_POS_ID');
+  }
   need('TAMI_USERNAME', cfg.kid);
   need('TAMI_PASSWORD', cfg.k);
   need('TAMI_SECRET_KEY', process.env.TAMI_SECRET_KEY);

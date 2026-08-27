@@ -20,6 +20,22 @@ function flag(value: string | undefined, fallback = true): boolean {
   return value !== '0' && value.toLowerCase() !== 'false' && value.toLowerCase() !== 'off';
 }
 
+const TAMI_PLACEHOLDER = /BURAYA_|CHANGE_ME|PLACEHOLDER|TEST_VALUE|EXAMPLE/i;
+
+export function isUsableTamiCredential(value: string | undefined): boolean {
+  const trimmed = trim(value);
+  if (!trimmed) return false;
+  if (TAMI_PLACEHOLDER.test(trimmed)) return false;
+  return true;
+}
+
+export function hasUsableTamiPosId(posId: string | undefined, merchantId?: string): boolean {
+  if (!isUsableTamiCredential(posId)) return false;
+  const merchant = trim(merchantId);
+  if (merchant && trim(posId) === merchant) return false;
+  return true;
+}
+
 export function paymentEnv(): PaymentEnvironment {
   const raw = (process.env.QNB_ENV || process.env.PAYMENT_ENV || 'test').trim().toLowerCase();
   return raw === 'production' || raw === 'prod' || raw === 'live' ? 'production' : 'test';
@@ -88,7 +104,12 @@ export function getPaymentConfig() {
   })();
   const tamiEnabled = flag(process.env.TAMI_ENABLED, true);
   const tamiConfigured = Boolean(
-    tamiEnabled && tamiMerchantId && tamiPosId && tamiSecretKey && tamiKidK.kid && tamiKidK.k
+    tamiEnabled &&
+      isUsableTamiCredential(tamiMerchantId) &&
+      hasUsableTamiPosId(tamiPosId, tamiMerchantId) &&
+      isUsableTamiCredential(tamiSecretKey) &&
+      isUsableTamiCredential(tamiKidK.kid) &&
+      isUsableTamiCredential(tamiKidK.k)
   );
   const sipayConfigured = Boolean(qnbAppId && qnbAppSecret && qnbMerchantKey);
   const payforConfigured = Boolean(qnbMerchantId && qnbUserCode && qnbPassword && qnbStoreKey);

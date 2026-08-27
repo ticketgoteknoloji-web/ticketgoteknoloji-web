@@ -284,7 +284,7 @@ async function startCheckoutUnlocked(input: {
       configured: false,
       message:
         input.provider === 'tami'
-          ? 'Tami / Garanti BBVA Sanal POS yapılandırması tamamlanmamış.'
+          ? 'Tami POS / Terminal ID henüz yapılandırılmadı.'
           : 'QNBpay yapılandırması tamamlanmamış.',
     };
   }

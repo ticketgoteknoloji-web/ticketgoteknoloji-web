@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
-import { fetchTcmbUsdSelling, type TcmbUsdQuote } from '@/services/exchange-rate/tcmb';
+import { USD_TRY_REFRESH_MS } from '@/lib/fx/refresh';
 import type { UsdTryQuote, UsdTryQuoteStatus } from '@/lib/fx/types';
+import { fetchTcmbUsdSelling, type TcmbUsdQuote } from '@/services/exchange-rate/tcmb';
 
 export type { UsdTryQuote, UsdTryQuoteStatus } from '@/lib/fx/types';
 
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_TTL_MS = USD_TRY_REFRESH_MS;
 const CACHE_FILE = path.join(process.cwd(), '.data', 'tcmb-usd-try.json');
 
 type StoredQuote = {

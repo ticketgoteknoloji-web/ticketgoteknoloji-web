@@ -23,11 +23,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
   const health = await tamiHealth();
-  const cfg = tamiConfig();
   return NextResponse.json({
     status: `Tami: ${health.status}`,
     env: health.env,
     configured: health.configured,
-    baseUrl: cfg.baseUrl,
+    ...(health.configured ? { baseUrl: tamiConfig().baseUrl } : {}),
   });
 }

@@ -1,8 +1,10 @@
 export type CardNetwork = 'visa' | 'mastercard' | 'troy';
 
-/** ISO/IEC 7812 PAN length. QNB test cards are typically 16 digits. */
-export const UI_CARD_NUMBER_MIN = 13;
-export const UI_CARD_NUMBER_DIGITS = 19;
+/** Checkout accepts a 16-digit PAN only (Visa / Mastercard / TROY). */
+export const UI_CARD_NUMBER_MIN = 16;
+export const UI_CARD_NUMBER_DIGITS = 16;
+/** 16 digits grouped as `xxxx xxxx xxxx xxxx`. */
+export const UI_CARD_NUMBER_INPUT_MAX = 19;
 
 export function digitsOnly(value: string): string {
   return value.replace(/\D/g, '');
@@ -53,15 +55,19 @@ export function luhnOk(value: string): boolean {
 
 export function cardNumberValid(value: string): boolean {
   const digits = digitsOnly(value);
-  if (digits.length < UI_CARD_NUMBER_MIN || digits.length > UI_CARD_NUMBER_DIGITS) return false;
-  if (luhnOk(digits)) return true;
-  return digits.length === 16 && detectCardNetwork(digits) !== null;
+  if (digits.length !== UI_CARD_NUMBER_DIGITS) return false;
+  return luhnOk(digits) || detectCardNetwork(digits) !== null;
 }
 
 export function formatExpiry(value: string): string {
   const digits = digitsOnly(value).slice(0, 4);
   if (digits.length <= 2) return digits;
   return `${digits.slice(0, 2)} / ${digits.slice(2)}`;
+}
+
+/** True when the field just reached its full digit length so focus can move to the next input. */
+export function shouldAdvanceCardField(previous: string, next: string, filledLength: number): boolean {
+  return digitsOnly(previous).length < filledLength && digitsOnly(next).length >= filledLength;
 }
 
 export function expiryValid(value: string, now = new Date()): boolean {

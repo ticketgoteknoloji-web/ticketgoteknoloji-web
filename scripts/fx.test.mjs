@@ -138,6 +138,37 @@ test('TEST 12: Turkish lira formatting', () => {
   assert.match(formatted, /8.450,32|8\.450,32/);
 });
 
+const HOUR_MS = 60 * 60 * 1000;
+
+function msUntilNextClockHour(now) {
+  const remaining = HOUR_MS - (now % HOUR_MS);
+  return remaining === 0 ? HOUR_MS : remaining;
+}
+
+test('hourly clock alignment waits until the next hour', () => {
+  assert.equal(msUntilNextClockHour(Date.parse('2026-08-27T14:00:00.000Z')), HOUR_MS);
+  assert.equal(msUntilNextClockHour(Date.parse('2026-08-27T14:59:00.000Z')), 60_000);
+  assert.equal(msUntilNextClockHour(Date.parse('2026-08-27T14:00:00.500Z')), HOUR_MS - 500);
+});
+
+test('TCMB quote refreshes every hour on server, layout, API and client', () => {
+  const refresh = readFileSync(join(root, 'src/lib/fx/refresh.ts'), 'utf8');
+  const service = readFileSync(join(root, 'src/services/exchange-rate/index.ts'), 'utf8');
+  const layout = readFileSync(join(root, 'src/app/layout.tsx'), 'utf8');
+  const api = readFileSync(join(root, 'src/app/api/exchange-rates/usd-try/route.ts'), 'utf8');
+  const provider = readFileSync(join(root, 'src/components/price/FxProvider.tsx'), 'utf8');
+  assert.match(refresh, /USD_TRY_REFRESH_MS = 60 \* 60 \* 1000/);
+  assert.match(refresh, /msUntilNextClockHour/);
+  assert.match(service, /USD_TRY_REFRESH_MS/);
+  assert.match(service, /CACHE_TTL_MS = USD_TRY_REFRESH_MS/);
+  assert.match(layout, /export const revalidate = 3600/);
+  assert.match(api, /s-maxage=3600/);
+  assert.match(provider, /msUntilNextClockHour/);
+  assert.match(provider, /visibilitychange/);
+  assert.match(provider, /cache: 'no-store'/);
+  assert.match(provider, /scheduleHourlyRefresh/);
+});
+
 test('TCMB service, API, ProductPrice and no hardcoded rate', () => {
   assert.equal(existsSync(join(root, 'src/services/exchange-rate/tcmb.ts')), true);
   assert.equal(existsSync(join(root, 'src/app/api/exchange-rates/usd-try/route.ts')), true);

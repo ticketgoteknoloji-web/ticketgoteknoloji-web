@@ -1,9 +1,9 @@
 import { randomBytes } from 'crypto';
-import { getPaymentConfig, paymentEnv, publicSiteUrl, qnbpayConfig, tamiConfig } from '@/config/payment';
+import { getPaymentConfig, hasUsableTamiPosId, isUsableTamiCredential, paymentEnv, publicSiteUrl, qnbpayConfig, tamiConfig } from '@/config/payment';
 import { BRAND_SITE_URL } from '@/lib/site';
 import type { PaymentProviderId } from '@/lib/payments/types';
 
-export { getPaymentConfig, paymentEnv, publicSiteUrl, qnbpayConfig, tamiConfig };
+export { getPaymentConfig, hasUsableTamiPosId, isUsableTamiCredential, paymentEnv, publicSiteUrl, qnbpayConfig, tamiConfig };
 
 export function publicBaseUrl(request?: Request): string {
   const paymentBase = process.env.PAYMENT_PUBLIC_BASE_URL?.trim();

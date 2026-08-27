@@ -23,6 +23,31 @@ function generateTamiPointQueryHash(merchantNumber, terminalNumber, secretKey) {
   return createHash('sha256').update(text, 'utf8').digest('base64');
 }
 
+function isUsableTamiCredential(value) {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) return false;
+  if (/BURAYA_|CHANGE_ME|PLACEHOLDER|TEST_VALUE|EXAMPLE/i.test(trimmed)) return false;
+  return true;
+}
+
+function hasUsableTamiPosId(posId, merchantId) {
+  if (!isUsableTamiCredential(posId)) return false;
+  const merchant = String(merchantId ?? '').trim();
+  if (merchant && String(posId).trim() === merchant) return false;
+  return true;
+}
+
+function tamiIsConfigured({ enabled = true, merchantId, posId, secretKey, kid, k }) {
+  return Boolean(
+    enabled &&
+      isUsableTamiCredential(merchantId) &&
+      hasUsableTamiPosId(posId, merchantId) &&
+      isUsableTamiCredential(secretKey) &&
+      isUsableTamiCredential(kid) &&
+      isUsableTamiCredential(k)
+  );
+}
+
 function computeCallbackHash(callback, secretKey) {
   const params =
     callback.hashParams ||
@@ -87,6 +112,40 @@ test('Tami point-query hash matches SHA-256 Base64 without separators', () => {
   assert.doesNotMatch(hash, /:/);
   assert.equal(hash.includes(secretKey), false);
   assert.doesNotMatch(hash, /\s/);
+});
+
+test('Tami configured requires a real POS ID and blocks auth without it', () => {
+  const base = {
+    merchantId: '123456',
+    secretKey: 'dummy-secret',
+    kid: 'dummy-kid',
+    k: 'dummy-k-value',
+  };
+  assert.equal(tamiIsConfigured({ ...base, posId: '' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'PLACEHOLDER' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'CHANGE_ME' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'BURAYA_YAZIN' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'TEST_VALUE' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'EXAMPLE' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: base.merchantId }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: '84006953' }), true);
+
+  const tami = readFileSync(join(root, 'src/lib/payments/tami.ts'), 'utf8');
+  const config = readFileSync(join(root, 'src/config/payment.ts'), 'utf8');
+  const checkout = readFileSync(join(root, 'src/components/payment/PaymentCheckout.tsx'), 'utf8');
+  const envExample = readFileSync(join(root, '.env.example'), 'utf8');
+  assert.match(envExample, /TAMI_POS_ID=/);
+  assert.match(config, /hasUsableTamiPosId\(tamiPosId, tamiMerchantId\)/);
+  assert.match(config, /BURAYA_|CHANGE_ME|PLACEHOLDER|TEST_VALUE|EXAMPLE/);
+  assert.match(tami, /MISSING_POS_ID/);
+  assert.match(tami, /tami_http_blocked/);
+  assert.match(tami, /hasUsableTamiPosId\(cfg\.posId, cfg\.merchantId\)/);
+  const blockedAt = tami.indexOf('tami_http_blocked');
+  const tokenAt = tami.indexOf("generatePgAuthToken(cfg.merchantId, cfg.posId, cfg.secretKey)");
+  assert.equal(blockedAt >= 0 && tokenAt > blockedAt, true);
+  assert.match(checkout, /if \(!configured\)/);
+  assert.match(checkout, /POS\/Terminal aktivasyonu bekleniyor/);
+  assert.doesNotMatch(tami, /posId \|\| cfg\.merchantId|merchantId as pos/i);
 });
 
 test('Tami callback hash canonicalises success 1/0 to true/false', () => {

@@ -15,6 +15,8 @@ const sansFont = DM_Sans({
   display: 'swap',
 });
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   metadataBase: new URL(BRAND_SITE_URL),
   title: {

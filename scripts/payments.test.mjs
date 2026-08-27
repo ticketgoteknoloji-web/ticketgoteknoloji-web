@@ -206,28 +206,39 @@ test('card number formatting and luhn stay client-side', () => {
   assert.match(cardUi, /export function luhnOk/);
   assert.match(cardUi, /export function formatExpiry/);
   assert.match(cardUi, /export function maskCardNumber/);
-  assert.match(cardUi, /UI_CARD_NUMBER_DIGITS = 19/);
-  assert.match(cardUi, /UI_CARD_NUMBER_MIN = 13/);
+  assert.match(cardUi, /UI_CARD_NUMBER_DIGITS = 16/);
+  assert.match(cardUi, /UI_CARD_NUMBER_MIN = 16/);
+  assert.match(cardUi, /UI_CARD_NUMBER_INPUT_MAX = 19/);
   assert.match(cardUi, /slice\(0, UI_CARD_NUMBER_DIGITS\)/);
   assert.doesNotMatch(cardUi, /length === 20/);
   assert.doesNotMatch(cardUi, /UI_CARD_NUMBER_DIGITS = 20/);
+  assert.doesNotMatch(cardUi, /UI_CARD_NUMBER_DIGITS = 19/);
   assert.doesNotMatch(cardUi, /localStorage|sessionStorage|fetch\(/);
   assert.match(checkout, /Kart numarasını kontrol edin/);
   assert.match(checkout, /xxxx xxxx xxxx xxxx/);
   assert.doesNotMatch(checkout, /1234 5678 9012 3456 7890/);
   assert.doesNotMatch(checkout, /20 rakam/);
-  assert.match(checkout, /maxLength=\{23\}/);
-  assert.match(checkout, /const canPay = Boolean\(customerValid && cardOk && legalAccepted && orderOk && !submitting/);
+  assert.match(checkout, /maxLength=\{UI_CARD_NUMBER_INPUT_MAX\}/);
+  assert.match(checkout, /shouldAdvanceCardField/);
+  assert.match(checkout, /expiryRef/);
+  assert.match(checkout, /cvvRef/);
+  assert.match(checkout, /const canPay = Boolean\([\s\S]*configured && customerValid && cardOk && legalAccepted && orderOk && !submitting && tryTotal != null/);
   assert.doesNotMatch(checkout, /disabled=\{!configured/);
 });
 
-test('16-digit PAN passes luhn and is not forced to 20 digits', () => {
+test('16-digit PAN passes luhn and extra digits are dropped', () => {
   function digitsOnly(value) {
     return value.replace(/\D/g, '');
   }
+  function formatCardNumber(value) {
+    return digitsOnly(value)
+      .slice(0, 16)
+      .replace(/(\d{4})(?=\d)/g, '$1 ')
+      .trim();
+  }
   function luhnOk(value) {
     const digits = digitsOnly(value);
-    if (digits.length < 13 || digits.length > 19) return false;
+    if (digits.length !== 16) return false;
     let sum = 0;
     let doubleDigit = false;
     for (let index = digits.length - 1; index >= 0; index -= 1) {
@@ -245,7 +256,27 @@ test('16-digit PAN passes luhn and is not forced to 20 digits', () => {
   assert.equal(sixteen.length, 16);
   assert.equal(luhnOk(sixteen), true);
   assert.equal(luhnOk('4111 1111 1111 1111'), true);
+  assert.equal(formatCardNumber('41111111111111119999'), '4111 1111 1111 1111');
+  assert.equal(digitsOnly(formatCardNumber('4111 1111 1111 1111 999')).length, 16);
   assert.notEqual(sixteen.length, 20);
+});
+
+test('card fields advance from PAN to expiry then CVV', () => {
+  function digitsOnly(value) {
+    return value.replace(/\D/g, '');
+  }
+  function shouldAdvanceCardField(previous, next, filledLength) {
+    return digitsOnly(previous).length < filledLength && digitsOnly(next).length >= filledLength;
+  }
+  assert.equal(shouldAdvanceCardField('4111 1111 1111 111', '4111 1111 1111 1111', 16), true);
+  assert.equal(shouldAdvanceCardField('4111 1111 1111 1111', '4111 1111 1111 1111', 16), false);
+  assert.equal(shouldAdvanceCardField('12 / 2', '12 / 29', 4), true);
+  assert.equal(shouldAdvanceCardField('12 / 29', '12 / 29', 4), false);
+  const panHandler = checkout.slice(checkout.indexOf('id="card-number"'), checkout.indexOf('id="card-expiry"'));
+  const expiryHandler = checkout.slice(checkout.indexOf('id="card-expiry"'), checkout.indexOf('id="card-cvv"'));
+  assert.match(panHandler, /expiryRef/);
+  assert.match(expiryHandler, /cvvRef/);
+  assert.doesNotMatch(panHandler, /cvvRef/);
 });
 
 test('QNB PayFor hash uses SHA1 ASCII then Base64', () => {
@@ -261,7 +292,7 @@ test('checkout CTA and card programs stay merchant-driven', () => {
   assert.doesNotMatch(checkout, /Test modu|TEST MODU/i);
   assert.match(checkout, /Tami \/ Garanti BBVA · 3D Secure/);
   assert.match(checkout, /Siparişinizi tamamlamak için kart ve fatura bilgilerinizi girin/);
-  assert.match(checkout, /Tami \/ Garanti BBVA Sanal POS bağlantısı henüz yapılandırılmadı/);
+  assert.match(checkout, /Tami \/ Garanti BBVA ödeme altyapısı henüz tamamlanmadı\. POS\/Terminal aktivasyonu bekleniyor/);
   assert.match(checkout, /KDV Hariç/);
   assert.match(checkout, /href="\/"/);
   assert.doesNotMatch(checkout, /Bu bankaların tamamı kesin desteklenmektedir/);
@@ -280,7 +311,7 @@ test('no fake success payment shortcut in providers', () => {
   assert.match(tami, /\/payment\/complete-3ds/);
   assert.doesNotMatch(tami, /fakeSuccess|mockPaid/);
   assert.doesNotMatch(qnbpay, /fakeSuccess|mockPaid/);
-  assert.match(service, /Tami \/ Garanti BBVA Sanal POS yapılandırması tamamlanmamış/);
+  assert.match(service, /Tami POS \/ Terminal ID henüz yapılandırılmadı/);
 });
 
 test('payment URLs carry productId not a client price', () => {

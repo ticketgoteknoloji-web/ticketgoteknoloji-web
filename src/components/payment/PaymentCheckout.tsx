@@ -23,6 +23,9 @@ import {
   formatExpiry,
   maskCardNumber,
   networkLabel,
+  shouldAdvanceCardField,
+  UI_CARD_NUMBER_DIGITS,
+  UI_CARD_NUMBER_INPUT_MAX,
 } from '@/lib/payments/card-ui';
 import { createMailto, createWhatsAppLink } from '@/lib/mailto';
 import { BRAND_SUPPORT_EMAIL, BRAND_WHATSAPP_NUMBER } from '@/lib/site';
@@ -67,6 +70,12 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
   const [debugPayment, setDebugPayment] = useState(false);
+  const expiryRef = useRef<HTMLInputElement>(null);
+  const cvvRef = useRef<HTMLInputElement>(null);
+
+  function focusNextCardField(target: HTMLInputElement | null) {
+    queueMicrotask(() => target?.focus());
+  }
 
   const totalLabel = formatMinor(quote.totalMinor, quote.currency);
   const subtotalLabel = formatMinor(quote.subtotalMinor, quote.currency);
@@ -92,7 +101,9 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
   const cvvOk = cvvValid(cvv, network);
   const cardOk = holderOk && panOk && expiryOk && cvvOk;
   const orderOk = Boolean(quote.productId) && quote.totalMinor > 0;
-  const canPay = Boolean(customerValid && cardOk && legalAccepted && orderOk && !submitting && (tryTotal != null || !configured));
+  const canPay = Boolean(
+    configured && customerValid && cardOk && legalAccepted && orderOk && !submitting && tryTotal != null
+  );
   const fxRateAvailable = fx.rate != null;
   const tryTotalAvailable = tryTotal != null;
   const blockedBy = [
@@ -104,6 +115,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
     !cardOk ? 'cardOk' : null,
     !legalAccepted ? 'legalAccepted' : null,
     !orderOk ? 'orderOk' : null,
+    !configured ? 'configured' : null,
     submitting ? 'submitting' : null,
     configured && !tryTotalAvailable ? 'tryTotal' : null,
     configured && !fxRateAvailable ? 'fx.rate' : null,
@@ -225,6 +237,11 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
   async function startTamiPayment(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     if (submitting) return;
+    if (!configured) {
+      setMessageTone('info');
+      setMessage('Tami / Garanti BBVA ödeme altyapısı henüz tamamlanmadı. POS/Terminal aktivasyonu bekleniyor.');
+      return;
+    }
     setAttempted(true);
     if (!customerValid || !cardOk || !legalAccepted || !orderOk) {
       setMessageTone('error');
@@ -298,7 +315,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       setMessageTone(data.configured === false ? 'info' : 'error');
       setMessage(
         data.configured === false
-          ? 'Tami / Garanti BBVA Sanal POS bağlantısı henüz yapılandırılmadı. Test için üye işyeri bilgilerini .env.local dosyasına ekleyin.'
+          ? 'Tami / Garanti BBVA ödeme altyapısı henüz tamamlanmadı. POS/Terminal aktivasyonu bekleniyor.'
           : data.message || data.error || 'Tami ile ödeme başlatılamadı.'
       );
       setSubmitting(false);
@@ -464,12 +481,23 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                   autoComplete="cc-number"
                   autoCorrect="off"
                   spellCheck={false}
-                  maxLength={23}
+                  maxLength={UI_CARD_NUMBER_INPUT_MAX}
+                  enterKeyHint="next"
                   value={cardNumber}
-                  onChange={(event) => setCardNumber(formatCardNumber(event.target.value))}
+                  onChange={(event) => {
+                    const next = formatCardNumber(event.target.value);
+                    setCardNumber(next);
+                    if (shouldAdvanceCardField(cardNumber, next, UI_CARD_NUMBER_DIGITS)) {
+                      focusNextCardField(expiryRef.current);
+                    }
+                  }}
                   onPaste={(event) => {
                     event.preventDefault();
-                    setCardNumber(formatCardNumber(event.clipboardData.getData('text')));
+                    const next = formatCardNumber(event.clipboardData.getData('text'));
+                    setCardNumber(next);
+                    if (shouldAdvanceCardField(cardNumber, next, UI_CARD_NUMBER_DIGITS)) {
+                      focusNextCardField(expiryRef.current);
+                    }
                   }}
                   aria-invalid={attempted && !panOk}
                   aria-describedby={attempted && !panOk ? 'card-number-error' : 'card-network'}
@@ -492,12 +520,28 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                 <span className="font-medium text-ink">Son Kullanma Tarihi</span>
                 <input
                   id="card-expiry"
+                  ref={expiryRef}
                   inputMode="numeric"
                   autoComplete="cc-exp"
                   spellCheck={false}
                   maxLength={7}
+                  enterKeyHint="next"
                   value={expiry}
-                  onChange={(event) => setExpiry(formatExpiry(event.target.value))}
+                  onChange={(event) => {
+                    const next = formatExpiry(event.target.value);
+                    setExpiry(next);
+                    if (shouldAdvanceCardField(expiry, next, 4)) {
+                      focusNextCardField(cvvRef.current);
+                    }
+                  }}
+                  onPaste={(event) => {
+                    event.preventDefault();
+                    const next = formatExpiry(event.clipboardData.getData('text'));
+                    setExpiry(next);
+                    if (shouldAdvanceCardField(expiry, next, 4)) {
+                      focusNextCardField(cvvRef.current);
+                    }
+                  }}
                   aria-invalid={attempted && !expiryOk}
                   aria-describedby={attempted && !expiryOk ? 'card-expiry-error' : undefined}
                   className="field-input mt-1 font-mono"
@@ -513,12 +557,13 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                 <span className="font-medium text-ink">Güvenlik Kodu</span>
                 <input
                   id="card-cvv"
+                  ref={cvvRef}
                   type="password"
                   inputMode="numeric"
                   autoComplete="off"
-                  maxLength={4}
+                  maxLength={3}
                   value={cvv}
-                  onChange={(event) => setCvv(digitsOnly(event.target.value).slice(0, 4))}
+                  onChange={(event) => setCvv(digitsOnly(event.target.value).slice(0, 3))}
                   aria-invalid={attempted && !cvvOk}
                   aria-describedby={attempted && !cvvOk ? 'card-cvv-help card-cvv-error' : 'card-cvv-help'}
                   className="field-input mt-1 tracking-[0.35em]"
@@ -672,7 +717,9 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             <strong>{tryTotalLabel ?? totalLabel}</strong>
           </div>
           {!configured ? (
-            <p className="mt-2 text-xs text-warning">Tami / Garanti BBVA Sanal POS bağlantısı henüz yapılandırılmadı.</p>
+            <p className="mt-2 text-xs text-warning">
+              Tami / Garanti BBVA ödeme altyapısı henüz tamamlanmadı. POS/Terminal aktivasyonu bekleniyor.
+            </p>
           ) : tryTotal == null && !fxLoading ? (
             <p className="mt-2 text-xs text-warning">TCMB kuru alınamadı. TL tahsilatı şu anda başlatılamaz.</p>
           ) : null}
