@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { paymentEnv, tamiConfig } from '@/lib/payments/config';
+import { isTamiReady, paymentEnv, tamiConfig } from '@/lib/payments/config';
 import { tamiHealth } from '@/lib/payments/tami';
 import { hmacEquals, hmacSign, rateLimit, clientIp } from '@/lib/payments/security';
 
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     status: `Tami: ${health.status}`,
     env: health.env,
-    configured: health.configured,
-    ...(health.configured ? { baseUrl: tamiConfig().baseUrl } : {}),
+    configured: health.configured && isTamiReady(),
+    ...(health.configured && isTamiReady() ? { baseUrl: tamiConfig().baseUrl } : {}),
   });
 }

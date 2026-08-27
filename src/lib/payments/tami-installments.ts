@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { tamiConfig } from '@/lib/payments/config';
+import { isTamiReady, tamiConfig } from '@/lib/payments/config';
 import { paymentLog } from '@/lib/payments/security';
 import { generateTamiInstallmentHash } from '@/lib/payments/tami-crypto';
 
@@ -95,11 +95,11 @@ export async function queryTamiInstallments(rawBin: string): Promise<TamiInstall
 
   const cfg = tamiConfig();
   const correlationId = `Correlation${randomBytes(16).toString('hex')}`;
-  const installmentHash = cfg.configured
+  const installmentHash = isTamiReady()
     ? generateTamiInstallmentHash(cfg.merchantId, cfg.posId, cfg.secretKey)
     : '';
 
-  if (!installmentHash && cfg.configured) {
+  if (!installmentHash && isTamiReady()) {
     const quote = fallbackQuote('Taksit seçenekleri şu anda alınamadı. Ödeme tek çekim olarak devam eder.');
     paymentLog('tami_installments_failed', { bin: maskTamiBin(bin), success: false, correlationId, reason: 'hash_failed' });
     return quote;

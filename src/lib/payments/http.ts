@@ -46,7 +46,7 @@ function missingTamiEnvNames(): string[] {
   };
   const cfg = tamiConfig();
   need('TAMI_MERCHANT_ID', process.env.TAMI_MERCHANT_ID);
-  if (!hasUsableTamiPosId(process.env.TAMI_POS_ID || process.env.TAMI_TERMINAL_ID, process.env.TAMI_MERCHANT_ID)) {
+  if (!hasUsableTamiPosId(tamiConfig().posId, tamiConfig().merchantId)) {
     missing.push('TAMI_POS_ID');
   }
   need('TAMI_USERNAME', cfg.kid);

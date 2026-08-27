@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'crypto';
-import { tamiConfig } from '@/lib/payments/config';
+import { isTamiReady, tamiConfig } from '@/lib/payments/config';
 import { paymentLog } from '@/lib/payments/security';
 import { generateTamiPointQueryHash } from '@/lib/payments/tami-crypto';
 
@@ -94,7 +94,7 @@ export async function queryTamiPoints(input: {
   markCooldown(input.ip);
 
   const cfg = tamiConfig();
-  if (!cfg.configured) {
+  if (!isTamiReady()) {
     paymentLog('tami_points_unavailable', {
       success: false,
       correlationId,

@@ -37,6 +37,13 @@ function hasUsableTamiPosId(posId, merchantId) {
   return true;
 }
 
+function resolveTamiPosId(posId, terminalId, merchantId) {
+  if (hasUsableTamiPosId(posId, merchantId)) return String(posId).trim();
+  if (posId !== undefined) return '';
+  if (terminalId !== undefined && hasUsableTamiPosId(terminalId, merchantId)) return String(terminalId).trim();
+  return '';
+}
+
 function tamiIsConfigured({ enabled = true, merchantId, posId, secretKey, kid, k }) {
   return Boolean(
     enabled &&
@@ -130,19 +137,49 @@ test('Tami configured requires a real POS ID and blocks auth without it', () => 
   assert.equal(tamiIsConfigured({ ...base, posId: base.merchantId }), false);
   assert.equal(tamiIsConfigured({ ...base, posId: '84006953' }), true);
 
+  assert.equal(resolveTamiPosId('', undefined, base.merchantId), '');
+  assert.equal(resolveTamiPosId(undefined, undefined, base.merchantId), '');
+  assert.equal(resolveTamiPosId('', '84006953', base.merchantId), '');
+  assert.equal(resolveTamiPosId(undefined, '', base.merchantId), '');
+  assert.equal(resolveTamiPosId(undefined, 'PLACEHOLDER', base.merchantId), '');
+  assert.equal(resolveTamiPosId(undefined, base.merchantId, base.merchantId), '');
+  assert.equal(resolveTamiPosId(undefined, '84006953', base.merchantId), '84006953');
+  assert.equal(resolveTamiPosId('84006953', '99999999', base.merchantId), '84006953');
+  assert.equal(tamiIsConfigured({ ...base, posId: resolveTamiPosId('', undefined, base.merchantId) }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: resolveTamiPosId('84006953', undefined, base.merchantId) }), true);
+
   const tami = readFileSync(join(root, 'src/lib/payments/tami.ts'), 'utf8');
   const config = readFileSync(join(root, 'src/config/payment.ts'), 'utf8');
+  const libConfig = readFileSync(join(root, 'src/lib/payments/config.ts'), 'utf8');
+  const http = readFileSync(join(root, 'src/lib/payments/http.ts'), 'utf8');
+  const health = readFileSync(join(root, 'src/app/api/payments/tami/health/route.ts'), 'utf8');
   const checkout = readFileSync(join(root, 'src/components/payment/PaymentCheckout.tsx'), 'utf8');
   const envExample = readFileSync(join(root, '.env.example'), 'utf8');
   assert.match(envExample, /TAMI_POS_ID=/);
+  assert.match(config, /function resolveTamiPosId/);
+  assert.match(config, /tamiPosId = resolveTamiPosId\(\)/);
   assert.match(config, /hasUsableTamiPosId\(tamiPosId, tamiMerchantId\)/);
   assert.match(config, /BURAYA_|CHANGE_ME|PLACEHOLDER|TEST_VALUE|EXAMPLE/);
+  assert.doesNotMatch(config, /TAMI_POS_ID\) \|\| trim\(process\.env\.TAMI_TERMINAL_ID\)/);
+  assert.doesNotMatch(config, /posId \|\| tamiMerchantId|merchantId as pos/i);
+  assert.match(libConfig, /export function isTamiReady/);
+  assert.match(http, /hasUsableTamiPosId\(tamiConfig\(\)\.posId, tamiConfig\(\)\.merchantId\)/);
+  assert.doesNotMatch(http, /TAMI_POS_ID \|\| process\.env\.TAMI_TERMINAL_ID/);
   assert.match(tami, /MISSING_POS_ID/);
   assert.match(tami, /tami_http_blocked/);
-  assert.match(tami, /hasUsableTamiPosId\(cfg\.posId, cfg\.merchantId\)/);
-  const blockedAt = tami.indexOf('tami_http_blocked');
-  const tokenAt = tami.indexOf("generatePgAuthToken(cfg.merchantId, cfg.posId, cfg.secretKey)");
-  assert.equal(blockedAt >= 0 && tokenAt > blockedAt, true);
+  assert.match(tami, /isTamiReady\(\)/);
+  assert.match(health, /configured: health\.configured && isTamiReady\(\)/);
+  assert.match(health, /status: `Tami: \$\{health\.status\}`/);
+  const createFn = tami.slice(tami.indexOf('async createPayment'), tami.indexOf('async verifyPayment'));
+  const notConfiguredAt = createFn.indexOf("code: 'not_configured'");
+  const authCallAt = createFn.indexOf("tamiPost('/payment/auth'");
+  assert.equal(notConfiguredAt >= 0 && authCallAt > notConfiguredAt, true);
+  const postFn = tami.slice(tami.indexOf('async function tamiPost'), tami.indexOf('function buildAuthBody'));
+  const blockedAt = postFn.indexOf('tami_http_blocked');
+  const fetchAt = postFn.indexOf('await fetch');
+  const tokenAt = postFn.indexOf('generatePgAuthToken');
+  assert.equal(blockedAt >= 0 && fetchAt > blockedAt, true);
+  assert.equal(tokenAt > blockedAt, true);
   assert.match(checkout, /if \(!configured\)/);
   assert.match(checkout, /POS\/Terminal aktivasyonu bekleniyor/);
   assert.doesNotMatch(tami, /posId \|\| cfg\.merchantId|merchantId as pos/i);

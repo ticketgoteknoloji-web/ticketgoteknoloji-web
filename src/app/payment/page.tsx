@@ -17,7 +17,7 @@ import {
   quoteProduct,
 } from '@/lib/commerce-server';
 import { getQnbCardPrograms, merchantInstallmentCounts } from '@/config/qnbpay-card-programs';
-import { getPaymentConfig, tamiConfig } from '@/lib/payments/config';
+import { getPaymentConfig, isTamiReady, tamiConfig } from '@/lib/payments/config';
 import { getOrderById } from '@/lib/payments/orders';
 import { quoteUrl } from '@/lib/pricing';
 import { getProductImage } from '@/lib/payments/product-images';
@@ -282,9 +282,9 @@ export default async function PaymentPage({ searchParams }: { searchParams: Prom
     <main>
       <PaymentCheckout
         quote={quote}
-        configured={tamiConfig().configured}
+        configured={isTamiReady()}
         testMode={getPaymentConfig().tami.env !== 'production'}
-        providerStatus={`Tami: ${tamiConfig().configured ? 'READY' : 'CREDENTIAL BEKLİYOR'}`}
+        providerStatus={`Tami: ${!tamiConfig().posId ? 'MISSING_POS_ID' : isTamiReady() ? 'READY' : 'CREDENTIAL BEKLİYOR'}`}
         cardPrograms={getQnbCardPrograms().filter((program) => program.enabled)}
         installments={merchantInstallmentCounts()}
       />

@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto';
 import { fromMinorUnits } from '@/lib/money';
 import { providerAmountMatches } from '@/lib/payments/amount';
 import { tamiChargeMinor } from '@/lib/payments/charge';
-import { hasUsableTamiPosId, tamiConfig } from '@/lib/payments/config';
+import { hasUsableTamiPosId, isTamiReady, tamiConfig } from '@/lib/payments/config';
 import { paymentLog } from '@/lib/payments/security';
 import {
   generateJwkSignature,
@@ -75,7 +75,7 @@ function signedBody(body: Record<string, unknown>): Record<string, unknown> {
 
 async function tamiPost(path: string, body: Record<string, unknown>): Promise<TamiJson> {
   const cfg = tamiConfig();
-  if (!cfg.configured || !hasUsableTamiPosId(cfg.posId, cfg.merchantId)) {
+  if (!isTamiReady() || !hasUsableTamiPosId(cfg.posId, cfg.merchantId)) {
     paymentLog('tami_http_blocked', { path, reason: 'missing_pos_id' });
     return { success: false, errorCode: 'missing_pos_id', errorMessage: 'Tami POS / Terminal ID henüz yapılandırılmadı.' };
   }
@@ -210,12 +210,12 @@ export class TamiPaymentProvider implements PaymentProvider {
   id = 'tami' as const;
 
   isConfigured(): boolean {
-    return tamiConfig().configured;
+    return isTamiReady();
   }
 
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
     const cfg = tamiConfig();
-    if (!cfg.configured || !hasUsableTamiPosId(cfg.posId, cfg.merchantId)) {
+    if (!isTamiReady() || !hasUsableTamiPosId(cfg.posId, cfg.merchantId)) {
       return { ok: false, code: 'not_configured', message: 'Tami POS / Terminal ID henüz yapılandırılmadı.' };
     }
     if (!input.card) {
@@ -330,6 +330,6 @@ export async function tamiHealth(): Promise<{ status: string; env: string; confi
   if (!hasUsableTamiPosId(cfg.posId, cfg.merchantId)) {
     return { status: 'MISSING_POS_ID', env: cfg.env, configured: false };
   }
-  if (!cfg.configured) return { status: 'MISSING_CREDENTIALS', env: cfg.env, configured: false };
+  if (!isTamiReady()) return { status: 'MISSING_CREDENTIALS', env: cfg.env, configured: false };
   return { status: 'READY', env: cfg.env, configured: true };
 }

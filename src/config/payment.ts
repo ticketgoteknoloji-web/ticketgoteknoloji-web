@@ -36,6 +36,22 @@ export function hasUsableTamiPosId(posId: string | undefined, merchantId?: strin
   return true;
 }
 
+/**
+ * POS / Terminal ID. Never invent a value and never use merchant ID as POS.
+ * TAMI_TERMINAL_ID is used only when TAMI_POS_ID is unset and the terminal value is a real credential.
+ * An explicit empty TAMI_POS_ID= stays missing.
+ */
+export function resolveTamiPosId(
+  posId: string | undefined = process.env.TAMI_POS_ID,
+  terminalId: string | undefined = process.env.TAMI_TERMINAL_ID,
+  merchantId: string | undefined = process.env.TAMI_MERCHANT_ID
+): string {
+  if (hasUsableTamiPosId(posId, merchantId)) return trim(posId);
+  if (posId !== undefined) return '';
+  if (terminalId !== undefined && hasUsableTamiPosId(terminalId, merchantId)) return trim(terminalId);
+  return '';
+}
+
 export function paymentEnv(): PaymentEnvironment {
   const raw = (process.env.QNB_ENV || process.env.PAYMENT_ENV || 'test').trim().toLowerCase();
   return raw === 'production' || raw === 'prod' || raw === 'live' ? 'production' : 'test';
@@ -87,7 +103,7 @@ export function getPaymentConfig() {
   const tamiProductionBase =
     trim(process.env.TAMI_PRODUCTION_BASE_URL) || 'https://paymentapi.tami.com.tr';
   const tamiMerchantId = trim(process.env.TAMI_MERCHANT_ID);
-  const tamiPosId = trim(process.env.TAMI_POS_ID) || trim(process.env.TAMI_TERMINAL_ID);
+  const tamiPosId = resolveTamiPosId();
   const tamiUsername = trim(process.env.TAMI_USERNAME) || trim(process.env.TAMI_KID) || trim(process.env.TAMI_JWK_KID);
   const tamiPassword = trim(process.env.TAMI_PASSWORD) || trim(process.env.TAMI_K) || trim(process.env.TAMI_JWK_K);
   const tamiSecretKey = trim(process.env.TAMI_SECRET_KEY);

@@ -1,6 +1,6 @@
-import { tamiConfig } from '@/config/payment';
+import { isTamiReady } from '@/lib/payments/config';
 import { SecurePaymentSection } from '@/components/home/SecurePaymentSection';
 
 export function SecurePaymentModule() {
-  return <SecurePaymentSection providerReady={tamiConfig().configured} />;
+  return <SecurePaymentSection providerReady={isTamiReady()} />;
 }
