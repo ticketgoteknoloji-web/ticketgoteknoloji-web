@@ -258,7 +258,7 @@ test('QNB PayFor hash uses SHA1 ASCII then Base64', () => {
 test('checkout CTA and card programs stay merchant-driven', () => {
   assert.match(checkout, /Güvenli Ödeme Yap/);
   assert.match(checkout, /Ödeme işlemi başlatılıyor/);
-  assert.match(checkout, /Test modu/);
+  assert.doesNotMatch(checkout, /Test modu|TEST MODU/i);
   assert.match(checkout, /Tami \/ Garanti BBVA · 3D Secure/);
   assert.match(checkout, /Siparişinizi tamamlamak için kart ve fatura bilgilerinizi girin/);
   assert.match(checkout, /Tami \/ Garanti BBVA Sanal POS bağlantısı henüz yapılandırılmadı/);

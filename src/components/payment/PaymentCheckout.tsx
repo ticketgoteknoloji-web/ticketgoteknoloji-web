@@ -36,7 +36,7 @@ type PaymentCheckoutProps = {
   installments: number[];
 };
 
-export function PaymentCheckout({ quote, configured, testMode, providerStatus, cardPrograms, installments }: PaymentCheckoutProps) {
+export function PaymentCheckout({ quote, configured, cardPrograms, installments }: PaymentCheckoutProps) {
   const idempotencyKey = useRef(
     typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
   );
@@ -190,20 +190,8 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
 
   return (
     <div className="section-wrap min-w-0 overflow-x-hidden py-8 sm:py-10">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-6">
         <BrandLogo variant="header" />
-        <div className="flex flex-wrap items-center gap-2">
-          {testMode ? (
-            <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-warning">
-              Test modu
-            </span>
-          ) : null}
-          {providerStatus && (testMode || process.env.NODE_ENV !== 'production') ? (
-            <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-muted">
-              {providerStatus}
-            </span>
-          ) : null}
-        </div>
       </div>
 
       <div className="max-w-3xl">
