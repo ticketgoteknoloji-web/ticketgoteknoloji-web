@@ -20,12 +20,23 @@ function flag(value: string | undefined, fallback = true): boolean {
   return value !== '0' && value.toLowerCase() !== 'false' && value.toLowerCase() !== 'off';
 }
 
-const TAMI_PLACEHOLDER = /BURAYA_|CHANGE_ME|PLACEHOLDER|TEST_VALUE|EXAMPLE/i;
+const TAMI_PLACEHOLDER_EXACT = new Set([
+  'GERCEK_POS_ID',
+  'GERCEK_TERMINAL_ID',
+  'BURAYA_POS_ID',
+  'BURAYA_TERMINAL_ID',
+  'CHANGE_ME',
+  'PLACEHOLDER',
+  'EXAMPLE',
+  'TEST_VALUE',
+]);
 
 export function isUsableTamiCredential(value: string | undefined): boolean {
   const trimmed = trim(value);
   if (!trimmed) return false;
-  if (TAMI_PLACEHOLDER.test(trimmed)) return false;
+  const upper = trimmed.toUpperCase();
+  if (upper.startsWith('GERCEK_') || upper.startsWith('BURAYA_')) return false;
+  if (TAMI_PLACEHOLDER_EXACT.has(upper)) return false;
   return true;
 }
 

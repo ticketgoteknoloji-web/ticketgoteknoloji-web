@@ -93,7 +93,9 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
     Boolean(phone.trim()) &&
     Boolean(address.trim()) &&
     Boolean(city.trim()) &&
-    Boolean(identityNumber.trim()) &&
+    (billingType === 'company'
+      ? /^\d{10}$/.test(digitsOnly(identityNumber))
+      : /^\d{11}$/.test(digitsOnly(identityNumber))) &&
     (billingType === 'individual' || (Boolean(company.trim()) && Boolean(taxOffice.trim())));
   const holderOk = Boolean(cardHolder.trim());
   const panOk = cardNumberValid(cardNumber);
@@ -600,7 +602,14 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             </label>
             <label className="text-sm sm:col-span-2">
               <span className="font-medium text-ink">Fatura tipi</span>
-              <select className="field-input mt-1" value={billingType} onChange={(event) => setBillingType(event.target.value as 'individual' | 'company')}>
+              <select
+                className="field-input mt-1"
+                value={billingType}
+                onChange={(event) => {
+                  setBillingType(event.target.value as 'individual' | 'company');
+                  setIdentityNumber('');
+                }}
+              >
                 <option value="individual">Bireysel</option>
                 <option value="company">Kurumsal</option>
               </select>
@@ -617,13 +626,33 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                 </label>
                 <label className="text-sm">
                   <span className="font-medium text-ink">Vergi numarası</span>
-                  <input required inputMode="numeric" value={identityNumber} onChange={(e) => setIdentityNumber(e.target.value)} className="field-input mt-1" />
+                  <input
+                    required
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={10}
+                    pattern="\d{10}"
+                    value={identityNumber}
+                    onChange={(event) => setIdentityNumber(digitsOnly(event.target.value).slice(0, 10))}
+                    className="field-input mt-1 font-mono"
+                    placeholder="10 haneli vergi no"
+                  />
                 </label>
               </>
             ) : (
               <label className="text-sm sm:col-span-2">
                 <span className="font-medium text-ink">T.C. kimlik numarası</span>
-                <input required inputMode="numeric" value={identityNumber} onChange={(e) => setIdentityNumber(e.target.value)} className="field-input mt-1" />
+                <input
+                  required
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={11}
+                  pattern="\d{11}"
+                  value={identityNumber}
+                  onChange={(event) => setIdentityNumber(digitsOnly(event.target.value).slice(0, 11))}
+                  className="field-input mt-1 font-mono"
+                  placeholder="11 haneli T.C. kimlik no"
+                />
               </label>
             )}
             <label className="text-sm sm:col-span-2">

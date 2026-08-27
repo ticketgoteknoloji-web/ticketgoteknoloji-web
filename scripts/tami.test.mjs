@@ -26,7 +26,20 @@ function generateTamiPointQueryHash(merchantNumber, terminalNumber, secretKey) {
 function isUsableTamiCredential(value) {
   const trimmed = String(value ?? '').trim();
   if (!trimmed) return false;
-  if (/BURAYA_|CHANGE_ME|PLACEHOLDER|TEST_VALUE|EXAMPLE/i.test(trimmed)) return false;
+  const upper = trimmed.toUpperCase();
+  if (upper.startsWith('GERCEK_') || upper.startsWith('BURAYA_')) return false;
+  if (
+    upper === 'GERCEK_POS_ID' ||
+    upper === 'GERCEK_TERMINAL_ID' ||
+    upper === 'BURAYA_POS_ID' ||
+    upper === 'BURAYA_TERMINAL_ID' ||
+    upper === 'CHANGE_ME' ||
+    upper === 'PLACEHOLDER' ||
+    upper === 'EXAMPLE' ||
+    upper === 'TEST_VALUE'
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -129,14 +142,23 @@ test('Tami configured requires a real POS ID and blocks auth without it', () => 
     k: 'dummy-k-value',
   };
   assert.equal(tamiIsConfigured({ ...base, posId: '' }), false);
-  assert.equal(tamiIsConfigured({ ...base, posId: 'PLACEHOLDER' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: '   ' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'GERCEK_POS_ID' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'GERCEK_TERMINAL_ID' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'BURAYA_POS_ID' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'BURAYA_TERMINAL_ID' }), false);
   assert.equal(tamiIsConfigured({ ...base, posId: 'CHANGE_ME' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'PLACEHOLDER' }), false);
   assert.equal(tamiIsConfigured({ ...base, posId: 'BURAYA_YAZIN' }), false);
   assert.equal(tamiIsConfigured({ ...base, posId: 'TEST_VALUE' }), false);
   assert.equal(tamiIsConfigured({ ...base, posId: 'EXAMPLE' }), false);
+  assert.equal(tamiIsConfigured({ ...base, posId: 'GERCEK_ANYTHING' }), false);
   assert.equal(tamiIsConfigured({ ...base, posId: base.merchantId }), false);
   assert.equal(tamiIsConfigured({ ...base, posId: '84006953' }), true);
 
+  assert.equal(resolveTamiPosId('GERCEK_POS_ID', undefined, base.merchantId), '');
+  assert.equal(resolveTamiPosId('BURAYA_POS_ID', undefined, base.merchantId), '');
+  assert.equal(resolveTamiPosId('CHANGE_ME', undefined, base.merchantId), '');
   assert.equal(resolveTamiPosId('', undefined, base.merchantId), '');
   assert.equal(resolveTamiPosId(undefined, undefined, base.merchantId), '');
   assert.equal(resolveTamiPosId('', '84006953', base.merchantId), '');
@@ -159,7 +181,18 @@ test('Tami configured requires a real POS ID and blocks auth without it', () => 
   assert.match(config, /function resolveTamiPosId/);
   assert.match(config, /tamiPosId = resolveTamiPosId\(\)/);
   assert.match(config, /hasUsableTamiPosId\(tamiPosId, tamiMerchantId\)/);
-  assert.match(config, /BURAYA_|CHANGE_ME|PLACEHOLDER|TEST_VALUE|EXAMPLE/);
+  assert.match(config, /GERCEK_POS_ID/);
+  assert.match(config, /GERCEK_TERMINAL_ID/);
+  assert.match(config, /BURAYA_POS_ID/);
+  assert.match(config, /startsWith\('GERCEK_'\) \|\| upper\.startsWith\('BURAYA_'\)/);
+  assert.match(config, /CHANGE_ME/);
+  assert.match(config, /PLACEHOLDER/);
+  assert.match(config, /TEST_VALUE/);
+  assert.match(config, /EXAMPLE/);
+  assert.match(libConfig, /isUsableTamiCredential\(cfg\.merchantId\)/);
+  assert.match(libConfig, /isUsableTamiCredential\(cfg\.secretKey\)/);
+  assert.match(libConfig, /isUsableTamiCredential\(cfg\.kid\)/);
+  assert.match(libConfig, /isUsableTamiCredential\(cfg\.k\)/);
   assert.doesNotMatch(config, /TAMI_POS_ID\) \|\| trim\(process\.env\.TAMI_TERMINAL_ID\)/);
   assert.doesNotMatch(config, /posId \|\| tamiMerchantId|merchantId as pos/i);
   assert.match(libConfig, /export function isTamiReady/);

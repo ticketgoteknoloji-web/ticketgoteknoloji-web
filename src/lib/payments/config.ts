@@ -23,10 +23,17 @@ export {
   tamiConfig,
 };
 
-/** Tami is ready only when merchant, POS, secret, kid and k are all real values. */
+/** Tami is ready only when merchant, POS, secret, kid and k are all real, non-placeholder values. */
 export function isTamiReady(): boolean {
   const cfg = tamiConfig();
-  return Boolean(cfg.configured && hasUsableTamiPosId(cfg.posId, cfg.merchantId));
+  return Boolean(
+    cfg.configured &&
+      isUsableTamiCredential(cfg.merchantId) &&
+      hasUsableTamiPosId(cfg.posId, cfg.merchantId) &&
+      isUsableTamiCredential(cfg.secretKey) &&
+      isUsableTamiCredential(cfg.kid) &&
+      isUsableTamiCredential(cfg.k)
+  );
 }
 
 export function publicBaseUrl(request?: Request): string {

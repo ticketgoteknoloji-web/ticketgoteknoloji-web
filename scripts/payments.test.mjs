@@ -112,6 +112,29 @@ test('quote-only items are not in the purchasable set', () => {
 test('valid TCKN checksum', () => {
   assert.equal(isValidTckn('10000000146'), true);
   assert.equal(isValidTckn('12345678901'), false);
+  assert.equal(isValidTckn('1000000014'), false);
+  assert.equal(isValidTckn('100000001466'), false);
+});
+
+test('billing identity fields lock VKN to 10 digits and TCKN to 11 digits', () => {
+  function digitsOnly(value) {
+    return value.replace(/\D/g, '');
+  }
+  assert.equal(digitsOnly('1234567890123').slice(0, 10), '1234567890');
+  assert.equal(digitsOnly('1234567890123').slice(0, 11), '12345678901');
+  assert.equal(digitsOnly('1234567890').length, 10);
+  assert.equal(digitsOnly('10000000146').length, 11);
+  assert.match(checkout, /Vergi numarası/);
+  assert.match(checkout, /T\.C\. kimlik numarası/);
+  assert.match(checkout, /maxLength=\{10\}/);
+  assert.match(checkout, /maxLength=\{11\}/);
+  assert.match(checkout, /slice\(0, 10\)/);
+  assert.match(checkout, /slice\(0, 11\)/);
+  assert.match(checkout, /\\d\{10\}/);
+  assert.match(checkout, /\\d\{11\}/);
+  assert.match(service, /Vergi numarası 10 haneli olmalıdır/);
+  assert.match(service, /isValidTckn/);
+  assert.match(service, /\^\\d\{10\}\$/);
 });
 
 test('card fields are ephemeral UI and never persisted client-side', () => {
