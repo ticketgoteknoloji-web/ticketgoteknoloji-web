@@ -70,7 +70,7 @@ export function PreInfoContent({ omitChrome = false }: { omitChrome?: boolean })
       <section>
         <h3 className="text-base font-semibold text-ink">Ödeme Yöntemi</h3>
         <p className="mt-2 text-muted">
-          QNBpay / QNB Sanal POS. Kart verileri {COMPANY.legalName} sisteminde tutulmaz.
+          Tami / Garanti BBVA Sanal POS. Kart verileri {COMPANY.legalName} sisteminde tutulmaz.
         </p>
       </section>
 

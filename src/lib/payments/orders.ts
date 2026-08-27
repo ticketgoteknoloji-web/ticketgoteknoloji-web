@@ -37,6 +37,8 @@ function normalizeAttempt(raw: PaymentAttempt): PaymentAttempt {
     cardProgram: raw.cardProgram ?? null,
     providerTransactionId: raw.providerTransactionId ?? null,
     responseCode: raw.responseCode ?? null,
+    mdStatus: raw.mdStatus ?? null,
+    bankReference: raw.bankReference ?? null,
   };
 }
 
@@ -59,6 +61,13 @@ function normalizeOrder(raw: OrderRecord): OrderRecord {
     distanceSalesVersion: raw.distanceSalesVersion ?? raw.legalAcceptance?.distanceSalesVersion ?? '',
     preInformationVersion: raw.preInformationVersion ?? raw.legalAcceptance?.preInformationVersion ?? '',
     legalAcceptedAt: raw.legalAcceptedAt ?? raw.legalAcceptance?.acceptedAt ?? raw.createdAt,
+    originalAmountMinor: raw.originalAmountMinor ?? raw.amountMinor,
+    originalCurrency: raw.originalCurrency ?? 'USD',
+    exchangeRate: raw.exchangeRate ?? null,
+    exchangeRateSource: raw.exchangeRateSource ?? null,
+    exchangeRateDate: raw.exchangeRateDate ?? null,
+    chargedAmountMinor: raw.chargedAmountMinor ?? null,
+    chargedCurrency: raw.chargedCurrency ?? null,
   };
 }
 

@@ -14,13 +14,13 @@ const flow = [
   { title: 'Sipariş', text: 'Ürün ve tutar sistem kaynağından doğrulanır.', Icon: ShoppingBag, img: '/images/payment/payment-order.webp' },
   { title: 'Güvenli Ödeme', text: 'Kart oturumu ödeme sağlayıcısına yönlendirilir.', Icon: CreditCard, img: '/images/payment/payment-secure.webp' },
   { title: '3D Secure', text: 'Kart sahibinin banka doğrulaması kullanılabilir.', Icon: ShieldCheck, img: '/images/payment/payment-3ds.webp' },
-  { title: 'Banka / QNBpay', text: 'İşlem sağlayıcı altyapısında yürütülür.', Icon: Landmark, img: '/images/payment/payment-bank.webp' },
+  { title: 'Banka / Tami', text: 'İşlem Tami / Garanti BBVA Sanal POS altyapısında yürütülür.', Icon: Landmark, img: '/images/payment/payment-bank.webp' },
   { title: 'Doğrulama', text: 'Sonuç sunucu tarafında kontrol edilir.', Icon: BadgeCheck, img: '/images/payment/payment-verification.webp' },
   { title: 'Ödeme Sonucu', text: 'Sipariş durumu kayıtla güncellenir.', Icon: CheckCircle2, img: '/images/payment/payment-result.webp', status: 'Doğrulandı' },
 ] as const;
 
 export function SecurePaymentSection({ providerReady }: SecurePaymentSectionProps) {
-  const providerLabel = providerReady ? 'QNBpay Sanal POS' : 'QNBpay / QNB Sanal POS entegrasyonuna hazır';
+  const providerLabel = providerReady ? 'Tami / Garanti BBVA Sanal POS' : 'Tami / Garanti BBVA Sanal POS entegrasyonuna hazır';
 
   return (
     <section id="guvenli-odeme" className="section-accent relative scroll-section overflow-hidden">

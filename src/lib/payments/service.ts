@@ -2,7 +2,7 @@ import { quoteProduct, type PaymentPeriod } from '@/lib/commerce-server';
 import { grantDownloadEntitlement, revokeDownloadEntitlementsForOrder } from '@/lib/downloads/store';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 import { formatMinor } from '@/lib/money';
-import { publicBaseUrl, qnbpayConfig } from '@/lib/payments/config';
+import { publicBaseUrl, qnbpayConfig, tamiConfig } from '@/lib/payments/config';
 import {
   appendAudit,
   createAttemptId,
@@ -18,8 +18,10 @@ import {
 } from '@/lib/payments/orders';
 import { getPaymentProvider } from '@/lib/payments/providers';
 import { launchToken } from '@/lib/payments/qnb-payfor';
+import { storeTami3dsHtml, tamiLaunchToken } from '@/lib/payments/tami-3ds';
+import { snapshotTryCharge } from '@/lib/payments/charge';
 import { paymentLog, randomToken } from '@/lib/payments/security';
-import type { OrderRecord, PaymentCustomer, PaymentProviderId, PublicOrderView } from '@/lib/payments/types';
+import type { OrderRecord, PaymentCard, PaymentCustomer, PaymentProviderId, PublicOrderView } from '@/lib/payments/types';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE = /^\+[1-9]\d{9,14}$/;
@@ -101,10 +103,11 @@ export async function startCheckout(input: {
   preInformationVersion?: string;
   installment?: number;
   cardProgram?: string;
+  card?: PaymentCard;
   request?: Request;
 }): Promise<CheckoutResult> {
-  if (input.provider !== 'qnbpay') {
-    throw new Error('Bu ödeme yöntemi artık kullanılmıyor. QNBpay ile devam edin.');
+  if (input.provider !== 'tami' && input.provider !== 'qnbpay') {
+    throw new Error('Bu ödeme yöntemi artık kullanılmıyor. Tami / Garanti BBVA Sanal POS ile devam edin.');
   }
   const lockKey = `${input.idempotencyKey}:${input.orderId || input.productId || ''}`;
   const pending = checkoutLocks.get(lockKey);
@@ -131,6 +134,7 @@ async function startCheckoutUnlocked(input: {
   preInformationVersion?: string;
   installment?: number;
   cardProgram?: string;
+  card?: PaymentCard;
   request?: Request;
 }): Promise<CheckoutResult> {
   if (!input.legalAccepted) {
@@ -171,6 +175,8 @@ async function startCheckoutUnlocked(input: {
     throw new Error('Ürün fiyatı değişti. Lütfen ödeme sayfasını yenileyin.');
   }
 
+  const fxSnap = await snapshotTryCharge(quote.totalMinor, existing);
+
   const now = new Date().toISOString();
   const legal = {
     distanceSalesVersion: LEGAL_VERSIONS.distanceSales.version,
@@ -191,6 +197,13 @@ async function startCheckoutUnlocked(input: {
     vatMinor: quote.vatMinor,
     vatRatePercent: quote.vatRatePercent,
     amountMinor: quote.totalMinor,
+    originalAmountMinor: fxSnap.originalAmountMinor,
+    originalCurrency: fxSnap.originalCurrency,
+    exchangeRate: fxSnap.exchangeRate,
+    exchangeRateSource: fxSnap.exchangeRateSource,
+    exchangeRateDate: fxSnap.exchangeRateDate,
+    chargedAmountMinor: fxSnap.chargedAmountMinor,
+    chargedCurrency: fxSnap.chargedCurrency,
     paymentProvider: input.provider,
     customerName: `${customer.firstName} ${customer.lastName}`.trim(),
     customerEmail: customer.email,
@@ -227,7 +240,7 @@ async function startCheckoutUnlocked(input: {
 
   if (order.status === 'paid') throw new Error('Bu sipariş zaten ödendi.');
 
-  if (order.status === 'awaiting_payment') {
+  if (order.status === 'awaiting_payment' && input.provider === 'qnbpay') {
     const latest = await getLatestAttempt(order.id);
     if (latest && (latest.status === 'redirected' || latest.status === 'created') && qnbpayConfig().mode === 'payfor') {
       const provider = getPaymentProvider('qnbpay');
@@ -248,13 +261,15 @@ async function startCheckoutUnlocked(input: {
     orderId: order.id,
     provider: input.provider,
     status: 'created',
-    amountMinor: quote.totalMinor,
-    currency: quote.currency,
+    amountMinor: fxSnap.chargedAmountMinor,
+    currency: fxSnap.chargedCurrency,
     installment: Math.max(1, Number(input.installment ?? 1) || 1),
     cardProgram: input.cardProgram?.trim() || null,
     providerReference: null,
     providerTransactionId: null,
     responseCode: null,
+    mdStatus: null,
+    bankReference: null,
     createdAt: now,
     updatedAt: now,
   });
@@ -264,7 +279,14 @@ async function startCheckoutUnlocked(input: {
   if (!provider.isConfigured()) {
     paymentLog('payment_not_configured', { provider: input.provider, orderNumber: order.orderNumber });
     await appendAudit({ orderId: order.id, attemptId: attempt.id, provider: input.provider, event: 'not_configured' });
-    return { order, configured: false, message: 'QNBpay yapılandırması tamamlanmamış.' };
+    return {
+      order,
+      configured: false,
+      message:
+        input.provider === 'tami'
+          ? 'Tami / Garanti BBVA Sanal POS yapılandırması tamamlanmamış.'
+          : 'QNBpay yapılandırması tamamlanmamış.',
+    };
   }
 
   const started = await updateOrder(order.id, {
@@ -275,13 +297,19 @@ async function startCheckoutUnlocked(input: {
   });
   const current = started ?? { ...order, customer, status: 'awaiting_payment' as const };
   const base = publicBaseUrl(input.request);
+  const tamiCallback = tamiConfig().callbackUrl;
+  const callbackUrl =
+    input.provider === 'tami' && tamiCallback
+      ? tamiCallback
+      : `${base}/api/payments/${input.provider}/callback`;
   const result = await provider.createPayment({
     order: current,
-    callbackUrl: `${base}/api/payments/${input.provider}/callback`,
+    callbackUrl,
     cancelUrl: `${base}/payment/cancelled?order=${encodeURIComponent(current.id)}`,
     ip: input.ip,
     installment: attempt.installment,
     cardProgram: attempt.cardProgram ?? undefined,
+    card: input.card,
   });
 
   if (!result.ok) {
@@ -298,6 +326,10 @@ async function startCheckoutUnlocked(input: {
     return { order: current, configured: true, message: result.message };
   }
 
+  if (result.threeDsHtml) {
+    storeTami3dsHtml(attempt.id, current.id, result.threeDsHtml);
+  }
+
   await updateAttempt(attempt.id, { status: 'redirected', providerReference: result.providerReference });
   await updateOrder(current.id, {
     providerToken: result.providerReference,
@@ -306,9 +338,11 @@ async function startCheckoutUnlocked(input: {
     billingAddress: customer.address,
   });
   const redirectUrl =
-    result.redirectUrl === 'payfor-launch'
-      ? `${base}/api/payments/qnbpay/launch?order=${encodeURIComponent(current.id)}&attempt=${encodeURIComponent(attempt.id)}&sig=${encodeURIComponent(launchToken(attempt.id, current.id))}`
-      : result.redirectUrl;
+    result.redirectUrl === 'tami-launch'
+      ? `${base}/api/payments/tami/launch?order=${encodeURIComponent(current.id)}&attempt=${encodeURIComponent(attempt.id)}&sig=${encodeURIComponent(tamiLaunchToken(attempt.id, current.id))}`
+      : result.redirectUrl === 'payfor-launch'
+        ? `${base}/api/payments/qnbpay/launch?order=${encodeURIComponent(current.id)}&attempt=${encodeURIComponent(attempt.id)}&sig=${encodeURIComponent(launchToken(attempt.id, current.id))}`
+        : result.redirectUrl;
   paymentLog('payment_started', { provider: input.provider, orderNumber: current.orderNumber, attemptId: attempt.id });
   await appendAudit({
     orderId: current.id,
@@ -326,10 +360,26 @@ export async function finalizeFromCallback(
   payload: Record<string, string>
 ): Promise<OrderRecord | null> {
   const order =
-    (await getOrderByProviderToken(payload.token || payload.paymentId || '')) ||
-    (await getOrderById(payload.conversationId || payload.invoice_id || payload.OrderId || payload.order_id || payload.merchantOid || ''));
+    (await getOrderByProviderToken(payload.token || payload.paymentId || payload.orderId || '')) ||
+    (await getOrderById(
+      payload.conversationId ||
+        payload.invoice_id ||
+        payload.OrderId ||
+        payload.order_id ||
+        payload.orderId ||
+        payload.merchantOid ||
+        ''
+    ));
   if (!order) return null;
-  const txn = payload.TransId || payload.transaction_id || payload.paymentId || payload.token || payload.HostRefNum || '';
+  const txn =
+    payload.bankReferenceNumber ||
+    payload.TransId ||
+    payload.transaction_id ||
+    payload.paymentId ||
+    payload.token ||
+    payload.HostRefNum ||
+    payload.orderId ||
+    '';
   if (order.status === 'paid') return order;
   if (txn && order.processedTransactionIds?.includes(txn)) return order;
 
@@ -364,7 +414,9 @@ export async function finalizeFromCallback(
       status: status === 'paid' ? 'paid' : status === 'cancelled' ? 'cancelled' : status === 'processing' ? 'redirected' : 'failed',
       providerTransactionId: verified.paymentTransactionId ?? verified.providerPaymentId ?? attempt.providerTransactionId,
       providerReference: verified.providerPaymentId ?? attempt.providerReference,
-      responseCode: payload.ProcReturnCode || payload.transaction_status || payload.status_code || null,
+      responseCode: payload.mdStatus || payload.ProcReturnCode || payload.transaction_status || payload.status_code || null,
+      mdStatus: payload.mdStatus || attempt.mdStatus,
+      bankReference: verified.paymentTransactionId ?? verified.providerPaymentId ?? attempt.bankReference,
     });
   }
   await appendAudit({
@@ -415,7 +467,10 @@ export function toPublicOrder(order: OrderRecord): PublicOrderView {
     productName: order.productName,
     status: order.status === 'payment_started' ? 'awaiting_payment' : order.status,
     paymentProvider: order.paymentProvider,
-    amountLabel: formatMinor(order.amountMinor, order.currency),
-    currency: order.currency,
+    amountLabel:
+      order.chargedAmountMinor != null && order.chargedCurrency
+        ? formatMinor(order.chargedAmountMinor, order.chargedCurrency)
+        : formatMinor(order.amountMinor, order.currency),
+    currency: order.chargedCurrency || order.currency,
   };
 }

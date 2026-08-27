@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { BrandLogo } from '@/components/BrandLogo';
 import { BuyButton } from '@/components/BuyButton';
 import { PaymentCheckout } from '@/components/payment/PaymentCheckout';
+import { ProductPrice } from '@/components/price/ProductPrice';
 import {
   checkoutPeriodFor,
   paymentUrl,
@@ -16,7 +17,7 @@ import {
   quoteProduct,
 } from '@/lib/commerce-server';
 import { getQnbCardPrograms, merchantInstallmentCounts } from '@/config/qnbpay-card-programs';
-import { getPaymentConfig, qnbpayConfig } from '@/lib/payments/config';
+import { getPaymentConfig, tamiConfig } from '@/lib/payments/config';
 import { getOrderById } from '@/lib/payments/orders';
 import { quoteUrl } from '@/lib/pricing';
 import { getProductImage } from '@/lib/payments/product-images';
@@ -40,11 +41,6 @@ type Search = {
   period?: string;
   qty?: string;
 };
-
-/** Format a USD amount as $1,990 (no cents) */
-function fmtUsd(amount: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
-}
 
 type ProductGroup = {
   eyebrow: string;
@@ -150,16 +146,12 @@ function ProductCard({ item, eyebrow, recommended }: { item: PricedItem | (typeo
 
         {priceUsd != null ? (
           <div className="mt-3 space-y-0.5">
-            <p className="text-xl font-semibold tracking-tight text-ink">
-              {fmtUsd(priceUsd)}
-              {periodLabel && (
-                <span className="ml-1 text-xs font-normal text-muted">{periodLabel}</span>
-              )}
-            </p>
+            <ProductPrice usdPrice={priceUsd} periodLabel={periodLabel} />
             <p className="text-[11px] text-muted">KDV hariç</p>
             {totalWithVat != null && (
               <p className="text-[11px] text-muted">
-                KDV dahil: <span className="font-medium text-ink">{fmtUsd(totalWithVat)}</span>
+                KDV dahil:{' '}
+                <ProductPrice compact usdPrice={totalWithVat} showRateInfo={false} className="inline-flex font-medium text-ink" />
                 <span className="ml-1 text-muted">(%{VAT_RATE_PERCENT} KDV)</span>
               </p>
             )}
@@ -190,7 +182,7 @@ function PaymentEntry({ message }: { message?: string }) {
       </div>
       <h1 className="mt-8 text-2xl font-semibold tracking-tight text-ink">Güvenli Ödeme</h1>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-        Kart bilgilerinizi girerek QNBpay güvenli ödeme altyapısı üzerinden işleminizi tamamlayabilirsiniz.
+        Kart bilgilerinizi girerek Tami / Garanti BBVA Sanal POS güvenli ödeme altyapısı üzerinden işleminizi tamamlayabilirsiniz.
       </p>
       {message && (
         <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
@@ -228,7 +220,7 @@ function PaymentEntry({ message }: { message?: string }) {
       </div>
 
       <p className="mt-8 text-xs text-muted">
-        Tüm fiyatlar USD cinsindendir ve KDV hariçtir. Ödeme adımında %{VAT_RATE_PERCENT} KDV eklenir.
+        Tüm fiyatlar USD cinsindendir ve KDV hariçtir. Ödeme adımında %{VAT_RATE_PERCENT} KDV eklenir. TL karşılığı TCMB güncel USD satış kuru üzerinden hesaplanır.
       </p>
       <Link href="/pricing" className="btn btn-secondary mt-4 rounded-full">
         Tüm fiyatları görün
@@ -290,9 +282,9 @@ export default async function PaymentPage({ searchParams }: { searchParams: Prom
     <main>
       <PaymentCheckout
         quote={quote}
-        configured={qnbpayConfig().configured}
-        testMode={getPaymentConfig().testMode}
-        providerStatus={`QNBpay: ${qnbpayConfig().configured ? 'READY' : 'CREDENTIAL BEKLİYOR'}`}
+        configured={tamiConfig().configured}
+        testMode={getPaymentConfig().tami.env !== 'production'}
+        providerStatus={`Tami: ${tamiConfig().configured ? 'READY' : 'CREDENTIAL BEKLİYOR'}`}
         cardPrograms={getQnbCardPrograms().filter((program) => program.enabled)}
         installments={merchantInstallmentCounts()}
       />

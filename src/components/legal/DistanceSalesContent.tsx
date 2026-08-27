@@ -67,17 +67,17 @@ export function DistanceSalesContent({ omitChrome = false }: { omitChrome?: bool
         <h3 className="text-base font-semibold text-ink">4. Sipariş ve Sözleşmenin Kurulması</h3>
         <p className="mt-2 text-muted">
           Alıcı ürün veya hizmeti seçer, sipariş özetini ve toplam bedeli görür, işbu sözleşme ile ön
-          bilgilendirme formunu inceler, siparişe ve ödeme yükümlülüğüne ilişkin kabulü verir ve QNBpay /
-          QNB Sanal POS üzerinden ödemeyi tamamlar.
+          bilgilendirme formunu inceler, siparişe ve ödeme yükümlülüğüne ilişkin kabulü verir ve Tami /
+          Garanti BBVA Sanal POS üzerinden ödemeyi tamamlar.
         </p>
       </section>
 
       <section>
         <h3 className="text-base font-semibold text-ink">5. Ödeme</h3>
         <p className="mt-2 text-muted">
-          Ödeme; QNBpay / QNB Sanal POS altyapısı üzerinden, QNB&apos;nin barındırdığı güvenli 3D Host
-          ödeme sayfası ile alınır. Kart numarası, CVV/CVC ve son kullanma tarihi {COMPANY.legalName}{' '}
-          tarafından toplanmaz, saklanmaz, loglanmaz.
+          Ödeme; Tami / Garanti BBVA Sanal POS altyapısı üzerinden 3D Secure ile alınır. Kart bilgileri
+          yalnızca ödeme işlemini başlatmak için Tami’ye iletilir; {COMPANY.legalName} tarafından
+          veritabanına, loglara veya analitik sistemlerine kaydedilmez. CVV saklanmaz.
         </p>
       </section>
 

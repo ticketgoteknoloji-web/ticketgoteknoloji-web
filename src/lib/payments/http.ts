@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { startCheckout } from '@/lib/payments/service';
-import { publicBaseUrl, qnbpayConfig } from '@/lib/payments/config';
+import { publicBaseUrl, qnbpayConfig, tamiConfig } from '@/lib/payments/config';
+import { cardNumberValid, cvvValid, detectCardNetwork, digitsOnly, expiryValid } from '@/lib/payments/card-ui';
 import { clientIp, originAllowed, paymentLog, rateLimit, stripCardFields } from '@/lib/payments/security';
-import type { PaymentCustomer, PaymentProviderId } from '@/lib/payments/types';
+import type { PaymentCard, PaymentCustomer, PaymentProviderId } from '@/lib/payments/types';
 import type { PaymentPeriod } from '@/lib/commerce';
 
 function readString(value: unknown): string {
@@ -38,6 +39,42 @@ function missingQnbEnvNames(): string[] {
   return [...new Set(missing)];
 }
 
+function missingTamiEnvNames(): string[] {
+  const missing: string[] = [];
+  const need = (name: string, value: string | undefined) => {
+    if (!value?.trim()) missing.push(name);
+  };
+  const cfg = tamiConfig();
+  need('TAMI_MERCHANT_ID', process.env.TAMI_MERCHANT_ID);
+  need('TAMI_POS_ID', process.env.TAMI_POS_ID || process.env.TAMI_TERMINAL_ID);
+  need('TAMI_USERNAME', cfg.kid);
+  need('TAMI_PASSWORD', cfg.k);
+  need('TAMI_SECRET_KEY', process.env.TAMI_SECRET_KEY);
+  return [...new Set(missing)];
+}
+
+function readCard(raw: Record<string, unknown>): PaymentCard | undefined {
+  const source = raw.card;
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return undefined;
+  const card = source as Record<string, unknown>;
+  const holderName = readString(card.holderName || card.holder);
+  const number = digitsOnly(readString(card.number));
+  const expireMonth = digitsOnly(readString(card.expireMonth));
+  const expireYear = digitsOnly(readString(card.expireYear));
+  const cvv = digitsOnly(readString(card.cvv));
+  const expiry = `${expireMonth.padStart(2, '0')}${expireYear.slice(-2)}`;
+  if (!holderName || !cardNumberValid(number) || !expiryValid(expiry) || !cvvValid(cvv, detectCardNetwork(number))) {
+    return undefined;
+  }
+  return {
+    holderName,
+    number,
+    expireMonth: expireMonth.padStart(2, '0').slice(-2),
+    expireYear: expireYear.length === 2 ? `20${expireYear}` : expireYear.slice(0, 4),
+    cvv,
+  };
+}
+
 export async function handleCreatePayment(request: Request, provider: PaymentProviderId) {
   if (request.method !== 'POST') {
     return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
@@ -50,19 +87,31 @@ export async function handleCreatePayment(request: Request, provider: PaymentPro
     return NextResponse.json({ error: 'Çok fazla deneme. Lütfen sonra tekrar deneyin.' }, { status: 429 });
   }
 
-  let body: Record<string, unknown>;
+  let raw: Record<string, unknown>;
   try {
-    body = stripCardFields((await request.json()) as Record<string, unknown>);
+    raw = (await request.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 400 });
   }
+
+  const card = provider === 'tami' ? readCard(raw) : undefined;
+  if (provider === 'tami' && !card) {
+    return NextResponse.json({ error: 'Kart bilgilerini kontrol edin.' }, { status: 400 });
+  }
+  const body = stripCardFields(raw);
 
   if (
     body.price != null ||
     body.amount != null ||
     body.total != null ||
     body.discount != null ||
-    body.paidPrice != null
+    body.paidPrice != null ||
+    body.rate != null ||
+    body.exchangeRate != null ||
+    body.tryAmount != null ||
+    body.paymentAmount != null ||
+    body.chargedAmount != null ||
+    body.usdTryRate != null
   ) {
     paymentLog('price_tamper_ignored', { provider });
   }
@@ -88,6 +137,7 @@ export async function handleCreatePayment(request: Request, provider: PaymentPro
       idempotencyKey: readString(body.idempotencyKey),
       installment: Number(body.installment ?? 1),
       cardProgram: readString(body.cardProgram) || undefined,
+      card,
       legalAccepted: body.legalAccepted === true,
       marketingOptIn: body.marketingOptIn === true,
       distanceSalesVersion: readString(body.distanceSalesVersion),
@@ -113,7 +163,7 @@ export async function handleCreatePayment(request: Request, provider: PaymentPro
         configured: false,
         message: result.message,
         orderNumber: result.order.orderNumber,
-        missingEnv: missingQnbEnvNames(),
+        missingEnv: provider === 'tami' ? missingTamiEnvNames() : missingQnbEnvNames(),
         callbackLocal: isLocalHostUrl(publicBaseUrl(request)),
       });
     }

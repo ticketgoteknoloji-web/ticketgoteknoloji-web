@@ -1,6 +1,6 @@
-import { qnbpayConfig } from '@/config/payment';
+import { tamiConfig } from '@/config/payment';
 import { SecurePaymentSection } from '@/components/home/SecurePaymentSection';
 
 export function SecurePaymentModule() {
-  return <SecurePaymentSection providerReady={qnbpayConfig().configured} />;
+  return <SecurePaymentSection providerReady={tamiConfig().configured} />;
 }

@@ -114,32 +114,36 @@ test('valid TCKN checksum', () => {
   assert.equal(isValidTckn('12345678901'), false);
 });
 
-test('card fields are ephemeral UI and stripped from payment payloads', () => {
+test('card fields are ephemeral UI and never persisted client-side', () => {
   const cleaned = stripCardFields({ invoice_id: 'SIP-1', cc_no: '4111111111111111', cvv: '123' });
   assert.deepEqual(cleaned, { invoice_id: 'SIP-1' });
   assert.match(http, /stripCardFields/);
   assert.doesNotMatch(checkout, /name=["'](cardNumber|cvv|cvc|expiry|cc_no)/i);
   assert.doesNotMatch(checkout, /localStorage|sessionStorage/);
-  const payloadStart = checkout.indexOf('body: JSON.stringify({');
-  assert.ok(payloadStart >= 0);
-  const payloadChunk = checkout.slice(payloadStart, payloadStart + 900);
-  assert.doesNotMatch(payloadChunk, /cardNumber:|cvv:|cc_no:|expiry:/);
+  assert.match(checkout, /\/api\/payments\/tami\/create/);
+  assert.match(checkout, /card: \{/);
+  assert.match(checkout, /cvv: digitsOnly\(cvv\)/);
   assert.match(checkout, /type="password"/);
   assert.match(checkout, /Kart Üzerindeki Ad Soyad/);
   assert.match(checkout, /Güvenlik Kodu/);
   assert.match(checkout, /maskCardNumber/);
+  assert.match(http, /provider === 'tami' \? readCard/);
+  assert.doesNotMatch(service, /cvv:/);
+  assert.doesNotMatch(readFileSync(join(root, 'src/lib/payments/orders.ts'), 'utf8'), /\bcvv\b/);
 });
 
 test('provider secrets stay server-side', () => {
   assert.equal(existsSync(join(root, 'src/lib/payments/iyzico.ts')), false);
   assert.equal(existsSync(join(root, 'src/app/api/payments/iyzico')), false);
   assert.match(qnbpay, /QNBPAY_APP_SECRET|qnbpayConfig/);
-  assert.doesNotMatch(checkout, /IYZICO_SECRET_KEY|QNBPAY_APP_SECRET|IYZICO_API_KEY|QNBPAY_STORE_KEY|QNBPAY_PASSWORD/);
+  assert.doesNotMatch(checkout, /IYZICO_SECRET_KEY|QNBPAY_APP_SECRET|IYZICO_API_KEY|QNBPAY_STORE_KEY|QNBPAY_PASSWORD|TAMI_SECRET_KEY|TAMI_PASSWORD/);
   assert.doesNotMatch(envExample, /IYZICO_/);
-  assert.match(envExample, /QNBPAY_APP_ID=/);
+  assert.match(envExample, /TAMI_MERCHANT_ID=/);
+  assert.match(envExample, /TAMI_SECRET_KEY=/);
+  assert.match(envExample, /TAMI_ENV=sandbox/);
+  assert.match(envExample, /QNBPAY_ENABLED=false/);
   assert.match(envExample, /NEXT_PUBLIC_SITE_URL=/);
-  assert.match(envExample, /QNBPAY_ENABLED=/);
-  assert.doesNotMatch(envExample, /NEXT_PUBLIC_IYZICO_|NEXT_PUBLIC_QNBPAY_/);
+  assert.doesNotMatch(envExample, /NEXT_PUBLIC_IYZICO_|NEXT_PUBLIC_QNBPAY_|NEXT_PUBLIC_TAMI_/);
 });
 
 test('checkout requires versioned contract acceptance', () => {
@@ -159,7 +163,10 @@ test('orders persist payment attempts and paidAt', () => {
 
 test('provider amount mismatch is not treated as paid', () => {
   assert.match(qnbpay, /providerAmountMatches/);
-  assert.match(qnbpay, /sipayDecryptHash/);
+  const tami = readFileSync(join(root, 'src/lib/payments/tami.ts'), 'utf8');
+  assert.match(tami, /providerAmountMatches/);
+  assert.match(tami, /tami_amount_mismatch/);
+  assert.match(tami, /\/payment\/complete-3ds/);
   const payfor = readFileSync(join(root, 'src/lib/payments/qnb-payfor.ts'), 'utf8');
   assert.match(payfor, /qnb_payfor_amount_mismatch/);
   assert.match(payfor, /qnb_payfor_hash_invalid/);
@@ -210,7 +217,7 @@ test('card number formatting and luhn stay client-side', () => {
   assert.doesNotMatch(checkout, /1234 5678 9012 3456 7890/);
   assert.doesNotMatch(checkout, /20 rakam/);
   assert.match(checkout, /maxLength=\{23\}/);
-  assert.match(checkout, /const canPay = Boolean\(customerValid && cardOk && legalAccepted && orderOk && !submitting\)/);
+  assert.match(checkout, /const canPay = Boolean\(customerValid && cardOk && legalAccepted && orderOk && !submitting/);
   assert.doesNotMatch(checkout, /disabled=\{!configured/);
 });
 
@@ -252,9 +259,9 @@ test('checkout CTA and card programs stay merchant-driven', () => {
   assert.match(checkout, /Güvenli Ödeme Yap/);
   assert.match(checkout, /Ödeme işlemi başlatılıyor/);
   assert.match(checkout, /Test modu/);
-  assert.match(checkout, /QNBpay · 3D Secure/);
+  assert.match(checkout, /Tami \/ Garanti BBVA · 3D Secure/);
   assert.match(checkout, /Siparişinizi tamamlamak için kart ve fatura bilgilerinizi girin/);
-  assert.match(checkout, /QNBpay Sanal POS bağlantısı henüz yapılandırılmadı/);
+  assert.match(checkout, /Tami \/ Garanti BBVA Sanal POS bağlantısı henüz yapılandırılmadı/);
   assert.match(checkout, /KDV Hariç/);
   assert.match(checkout, /href="\/"/);
   assert.doesNotMatch(checkout, /Bu bankaların tamamı kesin desteklenmektedir/);
@@ -268,9 +275,12 @@ test('payment signing secret fails closed in production', () => {
 });
 
 test('no fake success payment shortcut in providers', () => {
-  assert.match(qnbpay, /transaction_status === 'Completed'|ProcReturnCode === '00'|verifyPayforCallback/);
+  const tami = readFileSync(join(root, 'src/lib/payments/tami.ts'), 'utf8');
+  assert.match(tami, /verifyCallbackHash/);
+  assert.match(tami, /\/payment\/complete-3ds/);
+  assert.doesNotMatch(tami, /fakeSuccess|mockPaid/);
   assert.doesNotMatch(qnbpay, /fakeSuccess|mockPaid/);
-  assert.match(service, /QNBpay yapılandırması tamamlanmamış/);
+  assert.match(service, /Tami \/ Garanti BBVA Sanal POS yapılandırması tamamlanmamış/);
 });
 
 test('payment URLs carry productId not a client price', () => {
@@ -323,5 +333,5 @@ test('checkout applies central 20% VAT server-side', () => {
   assert.match(serviceFile, /vatRatePercent: quote\.vatRatePercent/);
   assert.match(serviceFile, /amountMinor: quote\.totalMinor/);
   assert.match(checkout, /KDV Dahil Toplam/);
-  assert.match(checkout, /Ödenecek Toplam/);
+  assert.match(checkout, /Karttan çekilecek/);
 });

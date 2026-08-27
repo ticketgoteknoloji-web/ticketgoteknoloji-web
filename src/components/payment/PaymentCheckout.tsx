@@ -1,15 +1,18 @@
 'use client';
 
-import { FormEvent, useMemo, useRef, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BrandLogo } from '@/components/BrandLogo';
 import { getProductImage } from '@/lib/payments/product-images';
 import { LegalTrigger } from '@/components/legal/LegalTrigger';
+import { useUsdTryQuote } from '@/components/price/FxProvider';
 import type { QnbCardProgram } from '@/config/qnbpay-card-programs';
 import type { ProductQuote } from '@/lib/commerce';
+import { convertUsdToTry } from '@/lib/fx/convert';
+import { formatTcmbDate, formatTryAmount, formatTryRate, formatUsdAmount } from '@/lib/fx/format';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
-import { formatMinor } from '@/lib/money';
+import { formatMinor, fromMinorUnits } from '@/lib/money';
 import {
   cardNumberValid,
   cvvValid,
@@ -62,6 +65,10 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
   const totalLabel = formatMinor(quote.totalMinor, quote.currency);
   const subtotalLabel = formatMinor(quote.subtotalMinor, quote.currency);
   const vatLabel = formatMinor(quote.vatMinor, quote.currency);
+  const { quote: fx, loading: fxLoading } = useUsdTryQuote();
+  const usdTotal = fromMinorUnits(quote.totalMinor);
+  const tryTotal = fx.rate != null ? convertUsdToTry(usdTotal, fx.rate) : null;
+  const tryTotalLabel = tryTotal != null ? formatTryAmount(tryTotal) : null;
   const enabledPrograms = cardPrograms.filter((item) => item.enabled);
   const network = detectCardNetwork(cardNumber);
   const customerValid =
@@ -79,7 +86,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
   const cvvOk = cvvValid(cvv, network);
   const cardOk = holderOk && panOk && expiryOk && cvvOk;
   const orderOk = Boolean(quote.productId) && quote.totalMinor > 0;
-  const canPay = Boolean(customerValid && cardOk && legalAccepted && orderOk && !submitting);
+  const canPay = Boolean(customerValid && cardOk && legalAccepted && orderOk && !submitting && (tryTotal != null || !configured));
 
   const errors = {
     holder: !holderOk ? 'Kart üzerindeki ad soyad alanını doldurun.' : null,
@@ -88,19 +95,13 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
     cvv: !cvvOk ? 'Güvenlik kodunu kontrol edin.' : null,
   };
 
-  const legalQuery = useMemo(() => {
-    const params = new URLSearchParams({ productId: quote.productId, period: quote.period });
-    if (quote.quantity !== 1) params.set('qty', String(quote.quantity));
-    return params.toString();
-  }, [quote.period, quote.productId, quote.quantity]);
-
   function clearSensitiveCard() {
     setCvv('');
     setCardNumber('');
     setExpiry('');
   }
 
-  async function startQnbPayment(event?: FormEvent<HTMLFormElement>) {
+  async function startTamiPayment(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     if (submitting) return;
     setAttempted(true);
@@ -112,7 +113,8 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
     setMessage(null);
     setSubmitting(true);
     try {
-      const response = await fetch('/api/payments/qnbpay/create', {
+      const expiryDigits = digitsOnly(expiry);
+      const response = await fetch('/api/payments/tami/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -138,6 +140,13 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             country: 'Turkey',
             billingType,
           },
+          card: {
+            holderName: cardHolder.trim(),
+            number: digitsOnly(cardNumber),
+            expireMonth: expiryDigits.slice(0, 2),
+            expireYear: expiryDigits.slice(2, 4),
+            cvv: digitsOnly(cvv),
+          },
         }),
       });
       const data = (await response.json()) as {
@@ -150,14 +159,14 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       };
       if (data.configured === false) {
         if (data.missingEnv?.length) {
-          console.info(`[TicketGo payment] QNBpay credentials missing. Set: ${data.missingEnv.join(', ')}`);
+          console.info(`[TicketGo payment] Tami credentials missing. Set: ${data.missingEnv.join(', ')}`);
         } else {
-          console.info('[TicketGo payment] QNBpay credentials missing. Check server-side environment variables.');
+          console.info('[TicketGo payment] Tami credentials missing. Check server-side environment variables.');
         }
       }
       if (data.callbackLocal) {
         console.info(
-          '[TicketGo payment] Callback URL is localhost. Remote QNB tests require PAYMENT_PUBLIC_BASE_URL on a public HTTPS origin.'
+          '[TicketGo payment] Callback URL is localhost. Remote Tami 3D Secure tests require PAYMENT_PUBLIC_BASE_URL or TAMI_CALLBACK_URL on a public HTTPS origin.'
         );
       }
       if (data.redirectUrl) {
@@ -168,8 +177,8 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       setMessageTone(data.configured === false ? 'info' : 'error');
       setMessage(
         data.configured === false
-          ? 'QNBpay Sanal POS bağlantısı henüz yapılandırılmadı. Test için üye işyeri bilgilerini .env.local dosyasına ekleyin.'
-          : data.message || data.error || 'QNBpay ile ödeme başlatılamadı.'
+          ? 'Tami / Garanti BBVA Sanal POS bağlantısı henüz yapılandırılmadı. Test için üye işyeri bilgilerini .env.local dosyasına ekleyin.'
+          : data.message || data.error || 'Tami ile ödeme başlatılamadı.'
       );
       setSubmitting(false);
     } catch {
@@ -200,7 +209,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       <div className="max-w-3xl">
         <h1 className="font-sans text-2xl font-bold tracking-[-0.03em] text-ink sm:text-3xl">Güvenli Ödeme</h1>
         <p className="mt-2 text-sm leading-6 text-muted">
-          Siparişinizi tamamlamak için kart ve fatura bilgilerinizi girin. Ödeme QNBpay güvenli altyapısı üzerinden
+          Siparişinizi tamamlamak için kart ve fatura bilgilerinizi girin. Ödeme Tami / Garanti BBVA Sanal POS güvenli altyapısı üzerinden
           yürütülür.
         </p>
         <Link href="/" className="mt-3 inline-block text-sm font-medium text-brand-600 hover:underline">
@@ -209,7 +218,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       </div>
 
       <form
-        onSubmit={startQnbPayment}
+        onSubmit={startTamiPayment}
         className="mt-8 grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]"
         autoComplete="on"
         noValidate
@@ -264,8 +273,33 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                 <dd>{totalLabel}</dd>
               </div>
             </dl>
+            <div className="mt-4 rounded-xl border border-line bg-canvas px-3 py-3 text-xs leading-5 text-muted">
+              <p className="flex justify-between gap-3">
+                <span>Ürün fiyatı (KDV dahil)</span>
+                <span className="font-medium text-ink">{formatUsdAmount(usdTotal)}</span>
+              </p>
+              <p className="mt-2 flex justify-between gap-3">
+                <span>TCMB USD satış kuru</span>
+                <span className="font-medium text-ink">
+                  {fx.rate != null ? `1 USD = ${formatTryRate(fx.rate)}` : fxLoading ? 'Yükleniyor' : 'Alınamadı'}
+                </span>
+              </p>
+              <p className="mt-2 flex justify-between gap-3">
+                <span>Kur tarihi</span>
+                <span className="font-medium text-ink">{formatTcmbDate(fx.date) || '—'}</span>
+              </p>
+              <p className="mt-2 flex justify-between gap-3 text-sm">
+                <span className="font-medium text-ink">Kartınızdan çekilecek tutar</span>
+                <span className="font-semibold text-ink">
+                  {tryTotalLabel ?? (fxLoading ? 'Hesaplanıyor...' : 'TL karşılığı şu anda hesaplanamıyor')}
+                </span>
+              </p>
+              <p className="mt-2 text-[11px] leading-5">
+                Kur kaynağı: Türkiye Cumhuriyet Merkez Bankası. USD olarak belirlenen ürün fiyatının TL karşılığı, ödeme işlemi başlatıldığı anda geçerli TCMB USD satış kuru kullanılarak hesaplanır.
+              </p>
+            </div>
             <p className="mt-4 text-xs leading-5 text-muted">
-              Tahsil edilecek tutar KDV dahil toplam bedeldir. Fiyatlar katalogdan sunucu tarafında hesaplanır.
+              Tahsil edilecek tutar KDV dahil toplam bedelin TCMB kuru ile TL karşılığıdır. Fiyatlar katalogdan sunucu tarafında hesaplanır.
             </p>
             </div>
           </section>
@@ -420,7 +454,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             {billingType === 'company' ? (
               <>
                 <label className="text-sm sm:col-span-2">
-                  <span className="font-medium text-ink">Firma Ünvan?</span>
+                  <span className="font-medium text-ink">Firma Ünvanı</span>
                   <input name="company" autoComplete="organization" value={company} onChange={(e) => setCompany(e.target.value)} className="field-input mt-1" />
                 </label>
                 <label className="text-sm">
@@ -428,13 +462,13 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                   <input name="taxOffice" value={taxOffice} onChange={(e) => setTaxOffice(e.target.value)} className="field-input mt-1" />
                 </label>
                 <label className="text-sm">
-                  <span className="font-medium text-ink">Vergi numaras?</span>
+                  <span className="font-medium text-ink">Vergi numarası</span>
                   <input required inputMode="numeric" value={identityNumber} onChange={(e) => setIdentityNumber(e.target.value)} className="field-input mt-1" />
                 </label>
               </>
             ) : (
               <label className="text-sm sm:col-span-2">
-                <span className="font-medium text-ink">T.C. kimlik numaras?</span>
+                <span className="font-medium text-ink">T.C. kimlik numarası</span>
                 <input required inputMode="numeric" value={identityNumber} onChange={(e) => setIdentityNumber(e.target.value)} className="field-input mt-1" />
               </label>
             )}
@@ -508,16 +542,18 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
           {message ? <p className={`mt-4 text-sm ${messageTone === 'error' ? 'text-danger' : 'text-brand-700'}`}>{message}</p> : null}
 
           <div className="payment-pay-bar mt-6">
-            <span className="text-sm font-medium text-ink">Ödenecek Toplam (KDV Dahil)</span>
-            <strong>{totalLabel}</strong>
+            <span className="text-sm font-medium text-ink">Karttan çekilecek (KDV Dahil)</span>
+            <strong>{tryTotalLabel ?? totalLabel}</strong>
           </div>
           {!configured ? (
-            <p className="mt-2 text-xs text-warning">QNBpay Sanal POS bağlantısı henüz yapılandırılmadı.</p>
+            <p className="mt-2 text-xs text-warning">Tami / Garanti BBVA Sanal POS bağlantısı henüz yapılandırılmadı.</p>
+          ) : tryTotal == null && !fxLoading ? (
+            <p className="mt-2 text-xs text-warning">TCMB kuru alınamadı. TL tahsilatı şu anda başlatılamaz.</p>
           ) : null}
           <button type="submit" disabled={!canPay} aria-disabled={!canPay} className="btn btn-primary mt-4 w-full">
             {submitting ? 'Ödeme işlemi başlatılıyor...' : 'Güvenli Ödeme Yap'}
           </button>
-          <p className="mt-2 text-center text-xs text-muted">QNBpay · 3D Secure</p>
+          <p className="mt-2 text-center text-xs text-muted">Tami / Garanti BBVA · 3D Secure</p>
           <p className="mt-3 text-xs leading-5 text-muted">
             Ödeme konusunda destek alın:{' '}
             <a

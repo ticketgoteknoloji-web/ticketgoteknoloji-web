@@ -79,7 +79,7 @@ export function RefundContent({ omitChrome = false }: { omitChrome?: boolean }) 
         <h3 className="text-base font-semibold text-ink">5. İade Süreci</h3>
         <p className="mt-2 text-muted">
           Talebin mevzuata uygun bulunduğu hallerde, bildirimden sonra yasal süreler içinde bedel iadesi
-          başlatılır. İade, kural olarak tahsilatın yapıldığı yönteme (QNBpay / kart kuruluşu)
+          başlatılır. İade, kural olarak tahsilatın yapıldığı yönteme (Tami / kart kuruluşu)
           yönlendirilir. Kart hesaplarına yansıma bankanın takvimine bağlıdır.
         </p>
       </section>

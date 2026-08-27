@@ -41,6 +41,7 @@ const PERIOD_LABEL: Record<PaymentPeriod, string> = {
 };
 
 const PROVIDER_LABEL: Record<PaymentProviderId, string> = {
+  tami: 'Tami / Garanti BBVA Sanal POS',
   qnbpay: 'QNBpay',
   iyzico: 'QNBpay',
 };
@@ -98,7 +99,7 @@ function fromQuote(quote: ProductQuote, extras?: { order?: OrderRecord; provider
     currency: quote.currency,
     paymentMethod: extras?.provider ? PROVIDER_LABEL[extras.provider] : extras?.order?.paymentProvider
       ? PROVIDER_LABEL[extras.order.paymentProvider]
-      : 'QNBpay / QNB Sanal POS',
+      : 'Tami / Garanti BBVA Sanal POS',
     fulfillment: fulfill.method,
     fulfillmentTime: fulfill.time,
     buyer,

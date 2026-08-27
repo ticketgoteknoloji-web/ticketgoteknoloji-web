@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Check } from 'lucide-react';
 import { BuyButton } from '@/components/BuyButton';
+import { ProductPrice } from '@/components/price/ProductPrice';
 import { checkoutPeriodFor, isPurchasable, paymentUrl } from '@/lib/commerce';
 import { formatMoney } from '@/lib/money';
 import {
@@ -139,19 +140,15 @@ export function OfferingCard({
         <p className="mt-1 min-h-6 line-clamp-1 text-sm font-medium text-brand-700">{item.headline}</p>
         <p className="mt-3 min-h-[6rem] line-clamp-4 text-sm leading-6 text-muted">{item.description}</p>
 
-        <div className="mt-5 min-h-[5.25rem]">
+        <div className="mt-5 min-h-[7.5rem]">
           {hasFlatPrice && flatPrice != null ? (
             <>
-              <p className="text-2xl font-semibold tracking-tight text-ink">
-                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(flatPrice)}
-                {flatPeriodLabel && (
-                  <span className="ml-1 text-sm font-medium text-muted">{flatPeriodLabel}</span>
-                )}
-              </p>
+              <ProductPrice usdPrice={flatPrice} periodLabel={flatPeriodLabel} />
               <p className="mt-0.5 text-xs font-medium text-muted">{priceExVatHint()}</p>
               {flatTotal != null && (
                 <p className="mt-1 text-sm text-muted">
-                  KDV dahil: <span className="font-semibold text-ink">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(flatTotal)}</span>
+                  KDV dahil:{' '}
+                  <ProductPrice compact usdPrice={flatTotal} showRateInfo={false} className="inline-flex font-semibold text-ink" />
                   <span className="ml-1 text-xs text-muted">(%20 KDV)</span>
                 </p>
               )}
@@ -160,11 +157,12 @@ export function OfferingCard({
             <p className="text-2xl font-semibold tracking-tight text-ink">Özel teklif</p>
           ) : amount !== null ? (
             <>
-              <p className="text-2xl font-semibold tracking-tight text-ink">
-                {item.startingAt ? <span className="mr-1 text-sm font-medium text-muted">Başlangıç </span> : null}
-                {formatMoney(amount, pricingCatalog.currency)}
-                <span className="ml-1 text-sm font-medium text-muted">{item.unit.includes('ay') ? '/ ay' : ''}</span>
-              </p>
+              <ProductPrice
+                usdPrice={amount}
+                usdFractionDigits={2}
+                prefix={item.startingAt ? <span className="mr-1 text-sm font-medium text-muted">Başlangıç </span> : null}
+                periodLabel={item.unit.includes('ay') ? '/ ay' : undefined}
+              />
               <p className="mt-0.5 text-xs font-medium text-muted">{priceExVatHint()}</p>
               {period === 'annual' && saved !== null && yearly !== null ? (
                 <p className="mt-1 text-sm text-brand-700">
@@ -176,10 +174,11 @@ export function OfferingCard({
             </>
           ) : (
             <>
-              <p className="text-2xl font-semibold tracking-tight text-ink">
-                {item.startingAt ? <span className="mr-1 text-sm font-medium text-muted">Başlangıç </span> : null}
-                {formatMoney(item.setupFee ?? 0, pricingCatalog.currency)}
-              </p>
+              <ProductPrice
+                usdPrice={item.setupFee ?? 0}
+                usdFractionDigits={2}
+                prefix={item.startingAt ? <span className="mr-1 text-sm font-medium text-muted">Başlangıç </span> : null}
+              />
               <p className="mt-0.5 text-xs font-medium text-muted">{priceExVatHint()}</p>
               <p className="mt-1 line-clamp-1 text-sm text-muted">{item.unit}</p>
             </>

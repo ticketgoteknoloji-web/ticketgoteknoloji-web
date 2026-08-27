@@ -101,7 +101,7 @@ export default function RefundPage() {
 
       <LegalSection title="8. Ödeme yöntemine iade">
         <p>
-          İade, kural olarak tahsilatın yapıldığı yönteme (QNBpay / kart kuruluşu) yönlendirilir. Kart
+          İade, kural olarak tahsilatın yapıldığı yönteme (Tami / kart kuruluşu) yönlendirilir. Kart
           hesaplarına yansıma, bankanın takvimine bağlıdır. TicketGo Teknoloji kart verisi tutmadığı için iade de ödeme
           kuruluşu kanalları üzerinden yürür.
         </p>

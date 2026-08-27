@@ -60,7 +60,7 @@ export function sanitizeLogValue(value: unknown): unknown {
 export function paymentLog(event: string, fields: Record<string, unknown>): void {
   const safe: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(fields)) {
-    if (/secret|authorization|card|cvv|cvc|pan|password|storekey|store_key|userpass|apiKey|api_key|appSecret/i.test(key) && key !== 'orderNumber') {
+    if (/secret|authorization|card|cvv|cvc|pan|password|storekey|store_key|userpass|apiKey|api_key|appSecret|threeds|htmlcontent|hasheddata/i.test(key) && key !== 'orderNumber') {
       safe[key] = '[redacted]';
     } else {
       safe[key] = sanitizeLogValue(value);
@@ -92,10 +92,21 @@ export function randomToken(): string {
 }
 
 export function stripCardFields(payload: Record<string, unknown>): Record<string, unknown> {
-  const blocked = /^(cc_|card|cvv|cvc|pan|expiry|expire|kart)/i;
   const next: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(payload)) {
-    if (blocked.test(key) || key.toLowerCase() === 'cc_no') continue;
+    const lower = key.toLowerCase();
+    if (
+      lower === 'card' ||
+      lower === 'cvv' ||
+      lower === 'cvc' ||
+      lower === 'pan' ||
+      lower === 'cc_no' ||
+      lower === 'cardnumber' ||
+      lower === 'holdername' ||
+      /^(cc_|cvv|cvc|expiry|expire)/i.test(key)
+    ) {
+      continue;
+    }
     next[key] = value;
   }
   return next;

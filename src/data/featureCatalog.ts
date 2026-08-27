@@ -161,7 +161,7 @@ export const featureCatalog: SolutionDetail[] = [
     technicalApproach:
       'Kimlik, yetki, log ve hata yönetimi servis katmanının parçasıdır. Kart verisi uygulamada tutulmaz; ödeme sağlayıcısı kendi oturumunu yürütür.',
     benefits: ['Kopuk sistemlerin azalması', 'Tekrarlı veri girişinin düşmesi', 'İzlenebilir entegrasyon'],
-    integrations: ['QNBpay', 'SMS', 'E-posta', 'CRM', 'ERP'],
+    integrations: ['Tami', 'SMS', 'E-posta', 'CRM', 'ERP'],
     visual: 'architecture',
     architecture: ['CRM', 'Ödeme', 'ERP', 'Bildirim', 'Harici Servis'],
     contactType: 'API & Entegrasyon',

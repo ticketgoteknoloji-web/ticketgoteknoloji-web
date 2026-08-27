@@ -28,10 +28,13 @@ export function paymentEnv(): PaymentEnvironment {
 export function publicSiteUrl(): string {
   const fromPayment = trim(process.env.PAYMENT_PUBLIC_BASE_URL);
   if (fromPayment) return fromPayment.replace(/\/$/, '');
+  const fromApp = trim(process.env.NEXT_PUBLIC_APP_URL);
+  if (fromApp && !isLocalUrl(fromApp)) return fromApp.replace(/\/$/, '');
   const fromPublic = trim(process.env.NEXT_PUBLIC_SITE_URL);
   if (fromPublic && !isLocalUrl(fromPublic)) return fromPublic.replace(/\/$/, '');
   if (paymentEnv() === 'production') return BRAND_SITE_URL;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL.replace(/\/$/, '')}`;
+  if (fromApp) return fromApp.replace(/\/$/, '');
   if (fromPublic) return fromPublic.replace(/\/$/, '');
   return 'http://localhost:3001';
 }
@@ -60,7 +63,33 @@ export function getPaymentConfig() {
     (env === 'production'
       ? 'https://vpos.qnb.com.tr/Gateway/Default.aspx'
       : 'https://vpostest.qnb.com.tr/Gateway/Default.aspx');
-  const qnbpayEnabled = flag(process.env.QNBPAY_ENABLED, true);
+  const qnbpayEnabled = flag(process.env.QNBPAY_ENABLED, false);
+  const tamiEnvRaw = (process.env.TAMI_ENV || 'sandbox').trim().toLowerCase();
+  const tamiEnv = tamiEnvRaw === 'production' || tamiEnvRaw === 'prod' || tamiEnvRaw === 'live' ? 'production' : 'sandbox';
+  const tamiSandboxBase =
+    trim(process.env.TAMI_SANDBOX_BASE_URL) || 'https://sandbox-paymentapi.tami.com.tr';
+  const tamiProductionBase =
+    trim(process.env.TAMI_PRODUCTION_BASE_URL) || 'https://paymentapi.tami.com.tr';
+  const tamiMerchantId = trim(process.env.TAMI_MERCHANT_ID);
+  const tamiPosId = trim(process.env.TAMI_POS_ID) || trim(process.env.TAMI_TERMINAL_ID);
+  const tamiUsername = trim(process.env.TAMI_USERNAME) || trim(process.env.TAMI_KID) || trim(process.env.TAMI_JWK_KID);
+  const tamiPassword = trim(process.env.TAMI_PASSWORD) || trim(process.env.TAMI_K) || trim(process.env.TAMI_JWK_K);
+  const tamiSecretKey = trim(process.env.TAMI_SECRET_KEY);
+  const tamiKidK = (() => {
+    const password = tamiPassword;
+    const pipe = password.indexOf('|');
+    if (pipe >= 0) {
+      return {
+        kid: password.slice(0, pipe).trim() || tamiUsername,
+        k: password.slice(pipe + 1).trim(),
+      };
+    }
+    return { kid: tamiUsername, k: password };
+  })();
+  const tamiEnabled = flag(process.env.TAMI_ENABLED, true);
+  const tamiConfigured = Boolean(
+    tamiEnabled && tamiMerchantId && tamiPosId && tamiSecretKey && tamiKidK.kid && tamiKidK.k
+  );
   const sipayConfigured = Boolean(qnbAppId && qnbAppSecret && qnbMerchantKey);
   const payforConfigured = Boolean(qnbMerchantId && qnbUserCode && qnbPassword && qnbStoreKey);
   const mode = payforConfigured ? 'payfor' : sipayConfigured ? 'sipay' : 'none';
@@ -90,9 +119,26 @@ export function getPaymentConfig() {
       payforConfigured,
       configured: qnbpayEnabled && (sipayConfigured || payforConfigured),
     },
+    tami: {
+      enabled: tamiEnabled,
+      env: tamiEnv,
+      baseUrl: tamiEnv === 'production' ? tamiProductionBase.replace(/\/$/, '') : tamiSandboxBase.replace(/\/$/, ''),
+      merchantId: tamiMerchantId,
+      posId: tamiPosId,
+      username: tamiUsername,
+      kid: tamiKidK.kid,
+      k: tamiKidK.k,
+      secretKey: tamiSecretKey,
+      callbackUrl: trim(process.env.TAMI_CALLBACK_URL),
+      configured: tamiConfigured,
+    },
   } as const;
 }
 
 export function qnbpayConfig() {
   return getPaymentConfig().qnbpay;
+}
+
+export function tamiConfig() {
+  return getPaymentConfig().tami;
 }
