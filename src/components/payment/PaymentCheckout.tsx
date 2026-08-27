@@ -36,7 +36,7 @@ type PaymentCheckoutProps = {
   installments: number[];
 };
 
-export function PaymentCheckout({ quote, configured, cardPrograms }: PaymentCheckoutProps) {
+export function PaymentCheckout({ quote, configured, testMode, providerStatus, cardPrograms }: PaymentCheckoutProps) {
   const idempotencyKey = useRef(
     typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
   );
@@ -66,6 +66,7 @@ export function PaymentCheckout({ quote, configured, cardPrograms }: PaymentChec
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
+  const [debugPayment, setDebugPayment] = useState(false);
 
   const totalLabel = formatMinor(quote.totalMinor, quote.currency);
   const subtotalLabel = formatMinor(quote.subtotalMinor, quote.currency);
@@ -92,6 +93,21 @@ export function PaymentCheckout({ quote, configured, cardPrograms }: PaymentChec
   const cardOk = holderOk && panOk && expiryOk && cvvOk;
   const orderOk = Boolean(quote.productId) && quote.totalMinor > 0;
   const canPay = Boolean(customerValid && cardOk && legalAccepted && orderOk && !submitting && (tryTotal != null || !configured));
+  const fxRateAvailable = fx.rate != null;
+  const tryTotalAvailable = tryTotal != null;
+  const blockedBy = [
+    !customerValid ? 'customerValid' : null,
+    !holderOk ? 'holderOk' : null,
+    !panOk ? 'panOk' : null,
+    !expiryOk ? 'expiryOk' : null,
+    !cvvOk ? 'cvvOk' : null,
+    !cardOk ? 'cardOk' : null,
+    !legalAccepted ? 'legalAccepted' : null,
+    !orderOk ? 'orderOk' : null,
+    submitting ? 'submitting' : null,
+    configured && !tryTotalAvailable ? 'tryTotal' : null,
+    configured && !fxRateAvailable ? 'fx.rate' : null,
+  ].filter((item): item is string => Boolean(item));
   const offeredInstallments = tamiInstallments.filter((item) => item.enabled && item.count >= 1);
   const installmentChoices = offeredInstallments.length ? offeredInstallments : [{ count: 1, enabled: true }];
   const tamiPointPanel = {
@@ -150,6 +166,48 @@ export function PaymentCheckout({ quote, configured, cardPrograms }: PaymentChec
       window.clearTimeout(timer);
     };
   }, [cardNumber]);
+
+  useEffect(() => {
+    try {
+      setDebugPayment(new URLSearchParams(window.location.search).get('debugPayment') === '1');
+    } catch {
+      setDebugPayment(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!debugPayment) return;
+    console.debug('[Payment Debug]', {
+      customerValid,
+      holderOk,
+      panOk,
+      expiryOk,
+      cvvOk,
+      cardOk,
+      legalAccepted,
+      orderOk,
+      configured,
+      fxRateAvailable,
+      tryTotalAvailable,
+      submitting,
+      canPay,
+    });
+  }, [
+    debugPayment,
+    customerValid,
+    holderOk,
+    panOk,
+    expiryOk,
+    cvvOk,
+    cardOk,
+    legalAccepted,
+    orderOk,
+    configured,
+    fxRateAvailable,
+    tryTotalAvailable,
+    submitting,
+    canPay,
+  ]);
 
   const errors = {
     holder: !holderOk ? 'Kart üzerindeki ad soyad alanını doldurun.' : null,
@@ -617,6 +675,42 @@ export function PaymentCheckout({ quote, configured, cardPrograms }: PaymentChec
             <p className="mt-2 text-xs text-warning">Tami / Garanti BBVA Sanal POS bağlantısı henüz yapılandırılmadı.</p>
           ) : tryTotal == null && !fxLoading ? (
             <p className="mt-2 text-xs text-warning">TCMB kuru alınamadı. TL tahsilatı şu anda başlatılamaz.</p>
+          ) : null}
+          {debugPayment ? (
+            <div className="mt-3 rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-[11px] leading-5 text-muted">
+              <p className="font-sans text-[10px] font-semibold uppercase tracking-wide text-ink">Payment debug</p>
+              <ul className="mt-1 space-y-0.5">
+                <li>customerValid: {customerValid ? 'TRUE' : 'FALSE'}</li>
+                <li>holderOk: {holderOk ? 'TRUE' : 'FALSE'}</li>
+                <li>panOk: {panOk ? 'TRUE' : 'FALSE'}</li>
+                <li>expiryOk: {expiryOk ? 'TRUE' : 'FALSE'}</li>
+                <li>cvvOk: {cvvOk ? 'TRUE' : 'FALSE'}</li>
+                <li>cardOk: {cardOk ? 'TRUE' : 'FALSE'}</li>
+                <li>legalAccepted: {legalAccepted ? 'TRUE' : 'FALSE'}</li>
+                <li>orderOk: {orderOk ? 'TRUE' : 'FALSE'}</li>
+                <li>configured: {configured ? 'TRUE' : 'FALSE'}</li>
+                <li>fxLoading: {fxLoading ? 'TRUE' : 'FALSE'}</li>
+                <li>fx.rate: {fxRateAvailable ? 'TRUE' : 'FALSE'}</li>
+                <li>tryTotal: {tryTotalAvailable ? 'TRUE' : 'FALSE'}</li>
+                <li>submitting: {submitting ? 'TRUE' : 'FALSE'}</li>
+                <li>canPay: {canPay ? 'TRUE' : 'FALSE'}</li>
+                <li>quote.productId: {quote.productId || '—'}</li>
+                <li>quote.period: {quote.period}</li>
+                <li>quote.totalMinor &gt; 0: {quote.totalMinor > 0 ? 'TRUE' : 'FALSE'}</li>
+                <li>providerStatus: {providerStatus || '—'}</li>
+                <li>testMode: {testMode ? 'TRUE' : 'FALSE'}</li>
+              </ul>
+              {!canPay ? (
+                <div className="mt-2 font-sans text-[11px] text-ink">
+                  <p>BLOCKED BY:</p>
+                  <ul className="mt-0.5">
+                    {(blockedBy.length ? blockedBy : ['(unknown)']).map((item) => (
+                      <li key={item}>- {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           ) : null}
           <button type="submit" disabled={!canPay} aria-disabled={!canPay} className="btn btn-primary mt-4 w-full">
             {submitting ? 'Ödeme işlemi başlatılıyor...' : 'Güvenli Ödeme Yap'}
