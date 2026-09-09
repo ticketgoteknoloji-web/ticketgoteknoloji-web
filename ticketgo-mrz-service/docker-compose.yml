@@ -1,0 +1,38 @@
+services:
+  ticketgo-mrz:
+    build: .
+    image: ticketgo-mrz:1.0.0
+    container_name: ticketgo-mrz
+    hostname: ticketgo-mrz
+    restart: unless-stopped
+    # Bind localhost only — public access must go through Cloudflare Tunnel
+    ports:
+      - "127.0.0.1:8091:8091"
+    # Load secrets from project .env only (do not interpolate MRZ_API_KEY from shell —
+    # a process-level MRZ_API_KEY would otherwise override a strong key in .env).
+    env_file:
+      - .env
+    environment:
+      MRZ_MAX_UPLOAD_MB: "8"
+      MRZ_RATE_LIMIT_PER_MINUTE: "30"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DEBUG: ${DEBUG:-false}
+      PADDLE_LANG: ${PADDLE_LANG:-en}
+      PADDLE_USE_GPU: ${PADDLE_USE_GPU:-false}
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    networks:
+      ticketgo-internal:
+        aliases:
+          - ticketgo-mrz
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8091/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+networks:
+  ticketgo-internal:
+    name: ticketgo-internal
+    driver: bridge

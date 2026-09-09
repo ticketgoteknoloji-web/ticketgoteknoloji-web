@@ -1,0 +1,11 @@
+# TicketGo MRZ — Cloudflare Named Tunnel (example)
+# Copy to %%USERPROFILE%%\.cloudflared\config.yml after tunnel create.
+# Do NOT commit real credentials.json or tunnel tokens.
+
+tunnel: <TUNNEL_ID>
+credentials-file: C:\Users\TUR BUDUR\.cloudflared\<TUNNEL_ID>.json
+
+ingress:
+  - hostname: mrz.ticketgoteknoloji.com
+    service: http://127.0.0.1:8091
+  - service: http_status:404
