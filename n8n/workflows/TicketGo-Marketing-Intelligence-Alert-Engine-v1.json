@@ -1,0 +1,282 @@
+{
+  "name": "TicketGo - Marketing Intelligence - Alert Engine v1",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Alert Engine\\n15 dk. Kanallar Disabled. Duplicate açık fingerprint yok.",
+        "width": 760,
+        "height": 240,
+        "color": 2
+      },
+      "id": "al-s1",
+      "name": "Grup Alert",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "al-sched",
+      "name": "Alert Tetikleyici",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -300,
+        40
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "al-manual",
+      "name": "Manuel Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  (SELECT jsonb_build_object('spend', COALESCE(SUM(spend),0), 'paid_bookings', COALESCE(SUM(paid_bookings),0), 'roas', CASE WHEN COALESCE(SUM(spend),0)=0 THEN NULL ELSE COALESCE(SUM(gross_revenue),0)/SUM(spend) END, 'refund_rate', CASE WHEN COALESCE(SUM(paid_bookings),0)=0 THEN NULL ELSE COALESCE(SUM(refunded_bookings),0)::numeric/SUM(paid_bookings) END) FROM marketing.marketing_kpi_daily WHERE date = CURRENT_DATE AND grain = 'overall') AS current,\n  (SELECT jsonb_build_object('spend', COALESCE(AVG(spend),0), 'paid_bookings', COALESCE(AVG(paid_bookings),0), 'roas', AVG(roas), 'refund_rate', AVG(refund_rate)) FROM marketing.marketing_kpi_daily WHERE date >= CURRENT_DATE - 7 AND date < CURRENT_DATE AND grain = 'overall') AS baseline,\n  (SELECT EXTRACT(EPOCH FROM (NOW() - MAX(paid_at)))/3600.0 FROM marketing.ticketgo_bookings WHERE booking_status = 'paid') AS hours_since_paid,\n  (SELECT jsonb_agg(jsonb_build_object('source', source, 'status', status, 'error_code', error_code)) FROM (SELECT DISTINCT ON (source) source, status, error_code FROM marketing.marketing_sync_runs ORDER BY source, started_at DESC) s) AS syncs;"
+      },
+      "id": "al-pg-read",
+      "name": "KPI Oku",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        80
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TICKETGO_MARKETING_POSTGRES",
+          "name": "TicketGo Marketing PostgreSQL"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "function pct(current, baseline) { if (!Number.isFinite(current) || !Number.isFinite(baseline) || baseline === 0) return null; return ((current - baseline) / Math.abs(baseline)) * 100; }\nconst row = $input.first().json;\nconst now = new Date().toISOString();\nconst current = row.current || {};\nconst baseline = row.baseline || {};\nconst alerts = [];\nconst spendChange = pct(Number(current.spend), Number(baseline.spend));\nconst salesChange = pct(Number(current.paid_bookings), Number(baseline.paid_bookings));\nif (spendChange != null && spendChange >= 50 && (salesChange == null || salesChange <= 0)) {\n  alerts.push({ severity: 'WARNING', category: 'SPEND_SPIKE', platform: null, campaignId: null, routeId: null, message: 'Spend rose ' + spendChange.toFixed(1) + '% vs 7-day average while paid bookings did not increase.', metric: 'spend', currentValue: Number(current.spend), baselineValue: Number(baseline.spend), detectedAt: now, fingerprint: 'SPEND_SPIKE' });\n}\nconst roasChange = pct(Number(current.roas), Number(baseline.roas));\nif (roasChange != null && roasChange <= -30) {\n  alerts.push({ severity: 'WARNING', category: 'ROAS_DROP', platform: null, campaignId: null, routeId: null, message: 'ROAS dropped ' + Math.abs(roasChange).toFixed(1) + '% vs 7-day average.', metric: 'roas', currentValue: Number(current.roas), baselineValue: Number(baseline.roas), detectedAt: now, fingerprint: 'ROAS_DROP' });\n}\nif (Number(current.spend) > 0 && row.hours_since_paid != null && Number(row.hours_since_paid) >= 3) {\n  alerts.push({ severity: 'CRITICAL', category: 'NO_SALES_WITH_SPEND', platform: null, campaignId: null, routeId: null, message: 'Spend continues but no paid booking for ' + Number(row.hours_since_paid).toFixed(1) + ' hours.', metric: 'hoursSinceLastPaidBooking', currentValue: Number(row.hours_since_paid), baselineValue: 3, detectedAt: now, fingerprint: 'NO_SALES_WITH_SPEND' });\n}\nconst refundChange = pct(Number(current.refund_rate), Number(baseline.refund_rate));\nif (refundChange != null && refundChange >= 50) {\n  alerts.push({ severity: 'WARNING', category: 'REFUND_SPIKE', platform: null, campaignId: null, routeId: null, message: 'Refund rate rose ' + refundChange.toFixed(1) + '% vs 7-day average.', metric: 'refundRate', currentValue: Number(current.refund_rate), baselineValue: Number(baseline.refund_rate), detectedAt: now, fingerprint: 'REFUND_SPIKE' });\n}\nfor (const sync of row.syncs || []) {\n  if (sync.source === 'ticketgo' && (sync.status === 'not_configured' || sync.status === 'failed')) {\n    alerts.push({ severity: 'CRITICAL', category: 'DATA_SOURCE_FAILURE', platform: 'ticketgo', campaignId: null, routeId: null, message: 'TicketGo sales API did not return data (NOT_CONFIGURED or sync failure).', metric: null, currentValue: null, baselineValue: null, detectedAt: now, fingerprint: 'DATA_SOURCE_FAILURE|ticketgo' });\n  }\n  if (['google_ads', 'meta_ads', 'ga4'].includes(sync.source) && sync.status === 'failed') {\n    alerts.push({ severity: 'CRITICAL', category: 'AD_PLATFORM_SYNC_FAILURE', platform: sync.source, campaignId: null, routeId: null, message: 'Ad platform sync failed', metric: null, currentValue: null, baselineValue: null, detectedAt: now, fingerprint: 'AD_PLATFORM_SYNC_FAILURE|' + sync.source });\n  }\n}\nreturn [{ json: { alerts: alerts, alertsJson: JSON.stringify(alerts).replace(/'/g, \"''\") } }];"
+      },
+      "id": "al-anom",
+      "name": "Anomali Kontrolü",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        80
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO marketing.marketing_alerts (severity, category, platform, campaign_id, route_id, message, metric, current_value, baseline_value, detected_at, fingerprint)\nSELECT (e->>'severity')::marketing.alert_severity, e->>'category', NULLIF(e->>'platform','')::marketing.platform, NULLIF(e->>'campaignId',''), NULLIF(e->>'routeId',''), e->>'message', e->>'metric', NULLIF(e->>'currentValue','')::numeric, NULLIF(e->>'baselineValue','')::numeric, (e->>'detectedAt')::timestamptz, e->>'fingerprint'\nFROM jsonb_array_elements('{{ $json.alertsJson }}'::jsonb) AS e\nON CONFLICT (fingerprint) WHERE is_resolved = false DO NOTHING;"
+      },
+      "id": "al-pg",
+      "name": "PostgreSQL'e Kaydet",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        640,
+        80
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TICKETGO_MARKETING_POSTGRES",
+          "name": "TicketGo Marketing PostgreSQL"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.alerts || []) }}"
+      },
+      "id": "al-slack",
+      "name": "Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        -80
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TELEGRAM_BOT_TOKEN ? \"https://api.telegram.org/bot\" + $env.TELEGRAM_BOT_TOKEN + \"/sendMessage\" : \"\" }}"
+      },
+      "id": "al-tg",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        80
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WHATSAPP_API_TOKEN ? \"https://graph.facebook.com/v21.0/me/messages\" : \"\" }}"
+      },
+      "id": "al-wa",
+      "name": "WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        240
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ALERT_EMAIL_TO ? \"mailto:\" + $env.ALERT_EMAIL_TO : \"\" }}"
+      },
+      "id": "al-em",
+      "name": "Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        400
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const err = $input.first().json;\nreturn [{ json: { source: 'alert_engine_v1', status: 'failed', errorCode: (err.error && err.error.code) || 'WORKFLOW_ERROR', errorMessage: String((err.error && err.error.message) || err.message || '').slice(0, 500), finishedAt: new Date().toISOString() } }];"
+      },
+      "id": "al-err",
+      "name": "Hata Kaydı Oluştur",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        320
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Alert Tetikleyici": {
+      "main": [
+        [
+          {
+            "node": "KPI Oku",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manuel Test": {
+      "main": [
+        [
+          {
+            "node": "KPI Oku",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KPI Oku": {
+      "main": [
+        [
+          {
+            "node": "Anomali Kontrolü",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hata Kaydı Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anomali Kontrolü": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL'e Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostgreSQL'e Kaydet": {
+      "main": [
+        [
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WhatsApp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hata Kaydı Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -172,6 +172,7 @@ def parse_td1(lines: list[str]) -> Td1ParseResult:
         "document_number": v_doc,
         "date_of_birth": v_dob,
         "expiry_date": v_exp,
+        "personal_number": True,
         "composite": v_comp,
         "ocr_checksum_corrected": ocr_checksum_corrected,
     }

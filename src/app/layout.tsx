@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { DM_Sans } from 'next/font/google';
 import { AnimatedLineBackground } from '@/components/AnimatedLineBackground';
 import { AppChrome } from '@/components/AppChrome';
 import { FloatingWhatsApp } from '@/components/FloatingWhatsApp';
 import { FxProvider } from '@/components/price/FxProvider';
 import { getUsdTryQuote } from '@/services/exchange-rate';
+import { isMrzHost } from '@/lib/mrz-host';
 import { BRAND_LEGAL_NAME, BRAND_SITE_URL } from '@/lib/site';
 import './globals.css';
 
@@ -56,6 +58,17 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const hdrs = await headers();
+  const mrz = isMrzHost(hdrs.get('x-forwarded-host') || hdrs.get('host'));
+
+  if (mrz) {
+    return (
+      <html lang="tr" className={sansFont.variable} data-mrz-app="true">
+        <body className="font-sans antialiased">{children}</body>
+      </html>
+    );
+  }
+
   const fx = await getUsdTryQuote();
   return (
     <html lang="tr" className={sansFont.variable}>

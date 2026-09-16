@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { AiSolutionsSection } from '@/components/home/AiSolutionsSection';
 import { ArchitectureMap } from '@/components/home/ArchitectureMap';
 import { CapabilitiesBar } from '@/components/home/CapabilitiesBar';
@@ -11,8 +12,15 @@ import { ServicesSection } from '@/components/home/ServicesSection';
 import { SolutionsSection } from '@/components/home/SolutionsSection';
 import { TechnologiesSection } from '@/components/home/TechnologiesSection';
 import { WhyTicketGoSection } from '@/components/home/WhyTicketGoSection';
+import { MrzVerifyScreen } from '@/components/mrz/MrzVerifyScreen';
+import { isMrzHost } from '@/lib/mrz-host';
 
-export default function HomePage() {
+export default async function HomePage() {
+  const hdrs = await headers();
+  if (isMrzHost(hdrs.get('x-forwarded-host') || hdrs.get('host'))) {
+    return <MrzVerifyScreen />;
+  }
+
   return (
     <main className="min-w-0 overflow-x-clip">
       <HeroSection />

@@ -155,6 +155,7 @@ def parse_td3(lines: list[str]) -> Td3ParseResult:
         "document_number": v_doc,
         "date_of_birth": v_dob,
         "expiry_date": v_exp,
+        "personal_number": v_opt,
         "composite": bool(v_comp and v_opt),
         "ocr_checksum_corrected": ocr_checksum_corrected,
     }

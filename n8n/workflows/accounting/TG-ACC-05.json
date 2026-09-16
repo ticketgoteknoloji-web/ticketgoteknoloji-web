@@ -1,0 +1,752 @@
+{
+  "id": "a11c0000-acc0-4000-8000-000000000005",
+  "name": "TG-ACC-05 Accounting Document OCR",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Kaynak: docs/N8N-HANDOFF.md\nBearer: $credentials.ticketgoAccountingApi.token\nPOST: Idempotency-Key zorunlu\n409 = duplicate/idempotent\n400 = retry yok\n401/403 = credential alert\n429 backoff; 5xx retry (max 3 via Wait+Retry node)\nKDV/tutar/tarih n8n'de hesaplanmaz\nError workflow import sonrası: TG-ACC-99\nPOST /api/n8n/documents sonra POST /api/n8n/ocr-result\nBu app OCR çalıştırmaz. Vendor URL uydurma.\nKategori kararı Core'da.",
+        "width": 540,
+        "height": 260,
+        "color": 3
+      },
+      "id": "a05-note",
+      "name": "OCR vendor yok",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -740,
+        -260
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a05-manual",
+      "name": "Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -540,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\nif (!j.fileHash) throw Object.assign(new Error('VALIDATION_NO_RETRY'), { noRetry: true, code: 'INVALID_QUERY' });\nconst body = { fileHash: j.fileHash, taxNumber: j.taxNumber, documentNumber: j.documentNumber, documentDate: j.documentDate, totalMinor: j.totalMinor, source: 'n8n', mimeType: j.mimeType };\nreturn [{ json: { idempotencyKey: 'doc:' + j.fileHash, body, ocr: j.ocr || {} } }];"
+      },
+      "id": "a05-in",
+      "name": "Intake fields from item",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -180,
+        80
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.TICKETGO_ACCOUNTING_BASE_URL || '').replace(/\\/+$/, '')}}/api/n8n/documents",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.ticketgoAccountingApi.token}}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{$json.idempotencyKey}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json.body)}}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a05-doc",
+      "name": "HTTP POST documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        80
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a05-ok-c",
+              "leftValue": "={{$json.statusCode}}",
+              "rightValue": 300,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a05-ok",
+      "name": "IF HTTP 2xx",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const status = Number($json.statusCode || 0);\nconst body = $json.body || {};\nconst code = body.code;\nif (status === 401 || status === 403 || code === 'UNAUTHORIZED' || code === 'N8N_TOKEN_NOT_CONFIGURED') {\n  throw Object.assign(new Error('SECURITY_CREDENTIAL_ALERT'), { httpStatus: status, code: code || 'UNAUTHORIZED', noRetry: true });\n}\nif (status === 400 || ['INVALID_QUERY','INVALID_JSON','IDEMPOTENCY_KEY_REQUIRED','BANK_ACCOUNT_NOT_FOUND','POS_PROVIDER_NOT_FOUND'].includes(code)) {\n  throw Object.assign(new Error('VALIDATION_NO_RETRY'), { httpStatus: status, code, noRetry: true });\n}\nif (status === 409 || code === 'IDEMPOTENCY_CONFLICT' || code === 'DUPLICATE_DOCUMENT') {\n  return [{ json: { duplicate: true, statusCode: status, code, body } }];\n}\nif ([429,500,502,503,504].includes(status)) {\n  return [{ json: { retry: true, statusCode: status, code, body } }];\n}\nif (status >= 400) {\n  throw Object.assign(new Error('HTTP_ERROR'), { httpStatus: status, code, noRetry: true });\n}\nreturn [{ json: { ok: true, statusCode: status, body, data: body.data } }];\n"
+      },
+      "id": "a05-dr",
+      "name": "HTTP Status Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        220
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c409",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 409,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "409"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c400",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 400,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "400"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c401",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 401,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "401"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c403",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 403,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "403"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c429",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 429,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "429"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c5xx",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 500,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "5xx"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "a05-sw",
+      "name": "Switch HTTP class",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        740,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "seconds"
+      },
+      "id": "a05-wait",
+      "name": "Backoff Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        360
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a05-dup",
+      "name": "409 Duplicate",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        80
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a05-noret",
+      "name": "400 No Retry",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a05-sec",
+      "name": "401/403 Alert",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const intake = $('Intake fields from item').first().json;\nconst prev = $json;\nconst o = intake.ocr || {};\nif (o.confidence == null || o.totalMinor == null) {\n  return [{ json: { configured: false, code: 'OCR_RESULT_FIELDS_MISSING', document: prev } }];\n}\nreturn [{ json: { configured: true, document: prev, ocr: o } }];"
+      },
+      "id": "a05-ocr",
+      "name": "OCR fields gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -40
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "o",
+              "leftValue": "={{$json.configured}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a05-ifocr",
+      "name": "IF OCR fields ready",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1340,
+        -40
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a05-ocrskip",
+      "name": "OCR vendor NOT_CONFIGURED",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1640,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const intake = $('Intake fields from item').first().json;\nconst doc = $('HTTP Status Router').first().json;\nconst documentId = doc.body && doc.body.data && doc.body.data.id;\nconst o = intake.ocr;\nconst body = { documentId, supplierName: o.supplierName, confidence: o.confidence, subtotalMinor: o.subtotalMinor, vatMinor: o.vatMinor, discountMinor: o.discountMinor, totalMinor: o.totalMinor, payload: o.payload || {} };\nreturn [{ json: { idempotencyKey: 'ocr:' + documentId, body } }];"
+      },
+      "id": "a05-ocrp",
+      "name": "Prepare ocr-result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        -80
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.TICKETGO_ACCOUNTING_BASE_URL || '').replace(/\\/+$/, '')}}/api/n8n/ocr-result",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.ticketgoAccountingApi.token}}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{$json.idempotencyKey}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json.body)}}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a05-ocrpost",
+      "name": "HTTP POST ocr-result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1940,
+        -80
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "p",
+                    "leftValue": "={{$json.body.data.status}}",
+                    "rightValue": "POSTED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "POSTED"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "r",
+                    "leftValue": "={{$json.body.data.status}}",
+                    "rightValue": "REVIEW_REQUIRED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "REVIEW"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "a05-ocrst",
+      "name": "Switch OCR Core decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2240,
+        -80
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a05-posted",
+      "name": "Core POSTED",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2540,
+        -140
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a05-review",
+      "name": "Core REVIEW_REQUIRED",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2540,
+        -20
+      ]
+    }
+  ],
+  "connections": {
+    "Manual": {
+      "main": [
+        [
+          {
+            "node": "Intake fields from item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intake fields from item": {
+      "main": [
+        [
+          {
+            "node": "HTTP POST documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP POST documents": {
+      "main": [
+        [
+          {
+            "node": "IF HTTP 2xx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF HTTP 2xx": {
+      "main": [
+        [
+          {
+            "node": "OCR fields gate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Status Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Status Router": {
+      "main": [
+        [
+          {
+            "node": "Switch HTTP class",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch HTTP class": {
+      "main": [
+        [
+          {
+            "node": "409 Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "400 No Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "401/403 Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "401/403 Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Backoff Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Backoff Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backoff Wait": {
+      "main": [
+        [
+          {
+            "node": "HTTP POST documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OCR fields gate": {
+      "main": [
+        [
+          {
+            "node": "IF OCR fields ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF OCR fields ready": {
+      "main": [
+        [
+          {
+            "node": "Prepare ocr-result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OCR vendor NOT_CONFIGURED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare ocr-result": {
+      "main": [
+        [
+          {
+            "node": "HTTP POST ocr-result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP POST ocr-result": {
+      "main": [
+        [
+          {
+            "node": "Switch OCR Core decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch OCR Core decision": {
+      "main": [
+        [
+          {
+            "node": "Core POSTED",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Core REVIEW_REQUIRED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveManualExecutions": true
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "preparedErrorWorkflow": "TG-ACC-99"
+  },
+  "tags": [],
+  "versionId": "a11c0000-acc0-4000-8000-000000000005"
+}

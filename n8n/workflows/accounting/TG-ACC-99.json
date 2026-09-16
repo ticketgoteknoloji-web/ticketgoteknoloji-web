@@ -1,0 +1,235 @@
+{
+  "id": "a11c0000-acc0-4000-8000-000000000099",
+  "name": "TG-ACC-99 Global Error Handler",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Kaynak: docs/N8N-HANDOFF.md\nBearer: $credentials.ticketgoAccountingApi.token\nPOST: Idempotency-Key zorunlu\n409 = duplicate/idempotent\n400 = retry yok\n401/403 = credential alert\n429 backoff; 5xx retry (max 3 via Wait+Retry node)\nKDV/tutar/tarih n8n'de hesaplanmaz\nError workflow import sonrası: TG-ACC-99\nError Trigger. Sahte Slack/email URL yok.\n401/403 SECURITY_CREDENTIAL_ALERT.\nYeni TicketGo event adı yok.",
+        "width": 520,
+        "height": 220,
+        "color": 2
+      },
+      "id": "a99-note",
+      "name": "Global errors",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        -240
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a99-err",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const exec = $json;\nconst msg = String((exec.execution && exec.execution.error && exec.execution.error.message) || '');\nconst httpStatus = Number((exec.execution && exec.execution.error && exec.execution.error.httpStatus) || 0);\nlet kind = 'OTHER';\nif (msg.includes('SECURITY_CREDENTIAL_ALERT') || httpStatus === 401 || httpStatus === 403) kind = 'SECURITY';\nelse if (msg.includes('VALIDATION_NO_RETRY') || httpStatus === 400) kind = 'VALIDATION';\nelse if (httpStatus === 429 || httpStatus >= 500) kind = 'RETRY_EXHAUSTED';\nreturn [{ json: { kind, httpStatus, message: msg, workflowName: exec.workflow && exec.workflow.name } }];"
+      },
+      "id": "a99-cls",
+      "name": "Classify error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        80
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "s",
+                    "leftValue": "={{$json.kind}}",
+                    "rightValue": "SECURITY",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "SECURITY"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "v",
+                    "leftValue": "={{$json.kind}}",
+                    "rightValue": "VALIDATION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "VALIDATION"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "r",
+                    "leftValue": "={{$json.kind}}",
+                    "rightValue": "RETRY_EXHAUSTED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "RETRY"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "a99-sw",
+      "name": "Switch error kind",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        180,
+        80
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a99-sec",
+      "name": "401/403 credential alert (wire notifier later)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        500,
+        -40
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a99-val",
+      "name": "400 validation — do not retry",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        500,
+        80
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a99-retry",
+      "name": "429/5xx exhausted",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        500,
+        200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a99-oth",
+      "name": "Other",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        500,
+        320
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Classify error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify error": {
+      "main": [
+        [
+          {
+            "node": "Switch error kind",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch error kind": {
+      "main": [
+        [
+          {
+            "node": "401/403 credential alert (wire notifier later)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "400 validation — do not retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "429/5xx exhausted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Other",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveManualExecutions": true
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "preparedErrorWorkflow": null
+  },
+  "tags": [],
+  "versionId": "a11c0000-acc0-4000-8000-000000000099"
+}

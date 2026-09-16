@@ -1,0 +1,825 @@
+{
+  "id": "a11c0000-acc0-4000-8000-000000000013",
+  "name": "TG-ACC-13 Luca Accounting Export",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "Kaynak: docs/N8N-HANDOFF.md\nBearer: $credentials.ticketgoAccountingApi.token\nPOST: Idempotency-Key zorunlu\n409 = duplicate/idempotent\n400 = retry yok\n401/403 = credential alert\n429 backoff; 5xx retry (max 3 via Wait+Retry node)\nKDV/tutar/tarih n8n'de hesaplanmaz\nError workflow import sonrası: TG-ACC-99\nGET /accounting/pending → POST /accounting/export\nLuca HTTP yalnız n8n credential ile.\nLUCA_API_* boşsa claim ETME (N8N_QUEUE’da kilitlenmesin).\nHesap kodu değiştirme; payload pass-through.",
+        "width": 560,
+        "height": 280,
+        "color": 3
+      },
+      "id": "a13-note",
+      "name": "Luca URL yok",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -760,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "a13-cron",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -540,
+        40
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a13-manual",
+      "name": "Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{($env.TICKETGO_ACCOUNTING_BASE_URL || '').replace(/\\/+$/, '')}}/api/n8n/accounting/pending",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "asOf",
+              "value": "={{$now.toUTC().toFormat(\"yyyy-MM-dd\")}}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.ticketgoAccountingApi.token}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a13-http",
+      "name": "HTTP Request TicketGo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -180,
+        80
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a13-ok-c",
+              "leftValue": "={{$json.statusCode}}",
+              "rightValue": 300,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a13-ok",
+      "name": "IF HTTP 2xx",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        140,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const status = Number($json.statusCode || 0);\nconst body = $json.body || {};\nconst code = body.code;\nif (status === 401 || status === 403 || code === 'UNAUTHORIZED' || code === 'N8N_TOKEN_NOT_CONFIGURED') {\n  throw Object.assign(new Error('SECURITY_CREDENTIAL_ALERT'), { httpStatus: status, code: code || 'UNAUTHORIZED', noRetry: true });\n}\nif (status === 400 || ['INVALID_QUERY','INVALID_JSON','IDEMPOTENCY_KEY_REQUIRED','BANK_ACCOUNT_NOT_FOUND','POS_PROVIDER_NOT_FOUND'].includes(code)) {\n  throw Object.assign(new Error('VALIDATION_NO_RETRY'), { httpStatus: status, code, noRetry: true });\n}\nif (status === 409 || code === 'IDEMPOTENCY_CONFLICT' || code === 'DUPLICATE_DOCUMENT') {\n  return [{ json: { duplicate: true, statusCode: status, code, body } }];\n}\nif ([429,500,502,503,504].includes(status)) {\n  return [{ json: { retry: true, statusCode: status, code, body } }];\n}\nif (status >= 400) {\n  throw Object.assign(new Error('HTTP_ERROR'), { httpStatus: status, code, noRetry: true });\n}\nreturn [{ json: { ok: true, statusCode: status, body, data: body.data } }];\n"
+      },
+      "id": "a13-router",
+      "name": "HTTP Status Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        140,
+        260
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c409",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 409,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "409"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c400",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 400,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "400"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c401",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 401,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "401"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c403",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 403,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "403"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c429",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 429,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "429"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c5xx",
+                    "leftValue": "={{$json.statusCode}}",
+                    "rightValue": 500,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "5xx"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "a13-sw",
+      "name": "Switch HTTP class",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        440,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "seconds"
+      },
+      "id": "a13-wait",
+      "name": "Backoff Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        740,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{($env.TICKETGO_ACCOUNTING_BASE_URL || '').replace(/\\/+$/, '')}}/api/n8n/accounting/pending",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "asOf",
+              "value": "={{$now.toUTC().toFormat(\"yyyy-MM-dd\")}}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.ticketgoAccountingApi.token}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a13-retry",
+      "name": "HTTP Request Retry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        420
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {},
+      "id": "a13-dup",
+      "name": "409 Duplicate",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        740,
+        140
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a13-noret",
+      "name": "400 No Retry",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        740,
+        220
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a13-sec",
+      "name": "401/403 Alert",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        740,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "body.data.exports",
+        "options": {}
+      },
+      "id": "a13-split",
+      "name": "Split Records",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        440,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = String($env.LUCA_API_BASE_URL || '').trim();\nconst key = String($env.LUCA_API_KEY || '').trim();\nreturn [{ json: { lucaConfigured: Boolean(base && key), lucaHttpCalled: false, transport: 'n8n' } }];"
+      },
+      "id": "a13-gate",
+      "name": "Luca credential gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        20
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "l",
+              "leftValue": "={{$json.lucaConfigured}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a13-if",
+      "name": "IF Luca configured",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        20
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a13-skip",
+      "name": "Luca NOT_CONFIGURED — no claim",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $('Split Records').item.json;\nconst body = item.body || {};\nconst payload = body.payload;\nreturn [{ json: { idempotencyKey: body.idempotencyKey, body: { idempotencyKey: body.idempotencyKey, entityId: body.entityId, entityType: body.entityType || 'INVOICE', payload } } }];"
+      },
+      "id": "a13-claim",
+      "name": "Prepare export claim",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        -40
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.TICKETGO_ACCOUNTING_BASE_URL || '').replace(/\\/+$/, '')}}/api/n8n/accounting/export",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.ticketgoAccountingApi.token}}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{$json.idempotencyKey}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json.body)}}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a13-exp",
+      "name": "POST accounting/export",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1640,
+        -40
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const status = Number($json.statusCode || 0);\nconst body = $json.body || {};\nconst code = body.code;\nif (status === 401 || status === 403 || code === 'UNAUTHORIZED' || code === 'N8N_TOKEN_NOT_CONFIGURED') {\n  throw Object.assign(new Error('SECURITY_CREDENTIAL_ALERT'), { httpStatus: status, code: code || 'UNAUTHORIZED', noRetry: true });\n}\nif (status === 400 || ['INVALID_QUERY','INVALID_JSON','IDEMPOTENCY_KEY_REQUIRED','BANK_ACCOUNT_NOT_FOUND','POS_PROVIDER_NOT_FOUND'].includes(code)) {\n  throw Object.assign(new Error('VALIDATION_NO_RETRY'), { httpStatus: status, code, noRetry: true });\n}\nif (status === 409 || code === 'IDEMPOTENCY_CONFLICT' || code === 'DUPLICATE_DOCUMENT') {\n  return [{ json: { duplicate: true, statusCode: status, code, body } }];\n}\nif ([429,500,502,503,504].includes(status)) {\n  return [{ json: { retry: true, statusCode: status, code, body } }];\n}\nif (status >= 400) {\n  throw Object.assign(new Error('HTTP_ERROR'), { httpStatus: status, code, noRetry: true });\n}\nreturn [{ json: { ok: true, statusCode: status, body, data: body.data } }];\n"
+      },
+      "id": "a13-exr",
+      "name": "Export claim router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1940,
+        -40
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "content": "HANDOFF: no Luca URL from this app.\nNode hazır; active etme.\nBody = pending item.body pass-through.",
+        "width": 420,
+        "height": 180,
+        "color": 2
+      },
+      "id": "a13-lucahttp",
+      "name": "Luca HTTP (disabled until URL exists)",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1640,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LUCA_API_BASE_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.LUCA_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json.body)}}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a13-luca",
+      "name": "HTTP Request Luca (inactive)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1940,
+        160
+      ],
+      "disabled": true,
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request TicketGo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request TicketGo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request TicketGo": {
+      "main": [
+        [
+          {
+            "node": "IF HTTP 2xx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF HTTP 2xx": {
+      "main": [
+        [
+          {
+            "node": "Split Records",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Status Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Status Router": {
+      "main": [
+        [
+          {
+            "node": "Switch HTTP class",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch HTTP class": {
+      "main": [
+        [
+          {
+            "node": "409 Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "400 No Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "401/403 Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "401/403 Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Backoff Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Backoff Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backoff Wait": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request Retry": {
+      "main": [
+        [
+          {
+            "node": "IF HTTP 2xx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Records": {
+      "main": [
+        [
+          {
+            "node": "Luca credential gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Luca credential gate": {
+      "main": [
+        [
+          {
+            "node": "IF Luca configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Luca configured": {
+      "main": [
+        [
+          {
+            "node": "Prepare export claim",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Luca NOT_CONFIGURED — no claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare export claim": {
+      "main": [
+        [
+          {
+            "node": "POST accounting/export",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST accounting/export": {
+      "main": [
+        [
+          {
+            "node": "Export claim router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export claim router": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request Luca (inactive)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveManualExecutions": true
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "preparedErrorWorkflow": "TG-ACC-99"
+  },
+  "tags": [],
+  "versionId": "a11c0000-acc0-4000-8000-000000000013"
+}

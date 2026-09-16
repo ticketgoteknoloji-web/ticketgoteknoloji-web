@@ -1,0 +1,346 @@
+{
+  "id": "a11c0000-acc0-4000-8000-000000000018",
+  "name": "TG-ACC-18 Daily Finance Summary",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "HANDOFF’ta daily-summary path ve event adı yok.\nÜç GET birleştirilir. Yeni event POST edilmez.\nTutar toplanmaz / KDV hesaplanmaz; yalnız sayım.",
+        "width": 540,
+        "height": 220,
+        "color": 3
+      },
+      "id": "a18-note",
+      "name": "Summary endpoint yok",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -740,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "a18-cron",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -540,
+        40
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a18-manual",
+      "name": "Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{($env.TICKETGO_ACCOUNTING_BASE_URL || '').replace(/\\/+$/, '')}}/api/n8n/invoices/due",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "asOf",
+              "value": "={{$now.toUTC().toFormat(\"yyyy-MM-dd\")}}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.ticketgoAccountingApi.token}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a18-inv",
+      "name": "GET invoices/due",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -180,
+        -40
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{($env.TICKETGO_ACCOUNTING_BASE_URL || '').replace(/\\/+$/, '')}}/api/n8n/accounting/pending",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "asOf",
+              "value": "={{$now.toUTC().toFormat(\"yyyy-MM-dd\")}}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.ticketgoAccountingApi.token}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a18-exp",
+      "name": "GET accounting/pending",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -180,
+        80
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{($env.TICKETGO_ACCOUNTING_BASE_URL || '').replace(/\\/+$/, '')}}/api/n8n/supplier-payments/due",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "asOf",
+              "value": "={{$now.toUTC().toFormat(\"yyyy-MM-dd\")}}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.ticketgoAccountingApi.token}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a18-pay",
+      "name": "GET supplier-payments/due",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -180,
+        200
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "numberInputs": 3,
+        "options": {}
+      },
+      "id": "a18-merge",
+      "name": "Merge GETs",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        200,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map((i) => i.json);\nfunction rows(item, key) {\n  const body = item.body || item;\n  const data = body.data || {};\n  return Array.isArray(data[key]) ? data[key].length : 0;\n}\nconst invoices = items.find((x) => x.body && x.body.data && x.body.data.invoices) || items[0] || {};\nconst exports = items.find((x) => x.body && x.body.data && x.body.data.exports) || items[1] || {};\nconst payments = items.find((x) => x.body && x.body.data && x.body.data.payments) || items[2] || {};\nreturn [{ json: { asOf: new Date().toISOString().slice(0, 10), invoiceDueCount: rows(invoices, 'invoices'), exportPendingCount: rows(exports, 'exports'), supplierPaymentDueCount: rows(payments, 'payments') } }];"
+      },
+      "id": "a18-sum",
+      "name": "Count-only snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        80
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {},
+      "id": "a18-done",
+      "name": "Snapshot ready (no invented event)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        780,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "GET invoices/due",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GET accounting/pending",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GET supplier-payments/due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual": {
+      "main": [
+        [
+          {
+            "node": "GET invoices/due",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GET accounting/pending",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GET supplier-payments/due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET invoices/due": {
+      "main": [
+        [
+          {
+            "node": "Merge GETs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET accounting/pending": {
+      "main": [
+        [
+          {
+            "node": "Merge GETs",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "GET supplier-payments/due": {
+      "main": [
+        [
+          {
+            "node": "Merge GETs",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge GETs": {
+      "main": [
+        [
+          {
+            "node": "Count-only snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count-only snapshot": {
+      "main": [
+        [
+          {
+            "node": "Snapshot ready (no invented event)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveManualExecutions": true
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "preparedErrorWorkflow": "TG-ACC-99"
+  },
+  "tags": [],
+  "versionId": "a11c0000-acc0-4000-8000-000000000018"
+}

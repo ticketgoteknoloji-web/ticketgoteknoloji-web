@@ -32,6 +32,7 @@ class ValidationResult(BaseModel):
     document_number: bool = False
     date_of_birth: bool = False
     expiry_date: bool = False
+    personal_number: bool = False
     composite: bool = False
     ocr_checksum_corrected: bool = False
 
@@ -70,3 +71,38 @@ class MrzErrorResponse(BaseModel):
     error: str
     message: str
     details: dict[str, Any] | None = None
+
+
+class GeneralOcrLine(BaseModel):
+    text: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    boundingBox: list[list[float]] = Field(default_factory=list)
+
+
+class VehicleRegistrationFields(BaseModel):
+    plate: str | None = None
+    vehicleType: str | None = None
+    brand: str | None = None
+    model: str | None = None
+    modelYear: str | None = None
+    vin: str | None = None
+    engineNumber: str | None = None
+    registrationDate: str | None = None
+    ownerName: str | None = None
+    documentNumber: str | None = None
+
+
+class GeneralOcrSuccessResponse(BaseModel):
+    success: Literal[True] = True
+    documentType: str
+    rawText: str
+    lines: list[GeneralOcrLine] = Field(default_factory=list)
+    fields: VehicleRegistrationFields = Field(default_factory=VehicleRegistrationFields)
+    ocrMs: int = 0
+    totalMs: int = 0
+
+
+class GeneralOcrErrorResponse(BaseModel):
+    success: Literal[False] = False
+    error: str
+    message: str

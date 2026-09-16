@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   trailingSlash: false,
   allowedDevOrigins: ['127.0.0.1', 'localhost', '192.168.1.106', '192.168.1.173'],
+  serverExternalPackages: ['tesseract.js', 'sharp'],
   async headers() {
     return [
       {

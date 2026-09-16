@@ -1,0 +1,368 @@
+{
+  "name": "TicketGo - Marketing Intelligence - Daily AI Report v1",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Daily AI Report\\n07:00 Europe/Istanbul. AUTO_ACTION_ENABLED=false. Bütçe yazılmaz.",
+        "width": 900,
+        "height": 280,
+        "color": 5
+      },
+      "id": "dr-s1",
+      "name": "Grup Daily",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "dr-sched",
+      "name": "Sabah Tetikleyici",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -360,
+        40
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "dr-manual",
+      "name": "Manuel Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT jsonb_build_object(\n  'current', (SELECT jsonb_agg(k) FROM marketing.marketing_kpi_daily k WHERE k.date = CURRENT_DATE AND k.grain IN ('overall','platform','campaign','route')),\n  'baseline', (SELECT jsonb_agg(k) FROM marketing.marketing_kpi_daily k WHERE k.date >= CURRENT_DATE - 7 AND k.date < CURRENT_DATE AND k.grain IN ('overall','campaign','route')),\n  'alerts', (SELECT COALESCE(jsonb_agg(a), '[]'::jsonb) FROM marketing.marketing_alerts a WHERE a.is_resolved = false)\n) AS report_input;"
+      },
+      "id": "dr-pg-read",
+      "name": "KPI Oku",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        80
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TICKETGO_MARKETING_POSTGRES",
+          "name": "TicketGo Marketing PostgreSQL"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json.report_input || $input.first().json;\nconst list = (key, grain) => (input[key] || []).filter((row) => row.grain === grain);\nconst currentOverall = list('current', 'overall')[0] || {};\nconst campaigns = list('current', 'campaign').slice().sort((a, b) => Number(b.roas || 0) - Number(a.roas || 0));\nconst routes = list('current', 'route').slice().sort((a, b) => Number(b.net_revenue || b.netRevenue || 0) - Number(a.net_revenue || a.netRevenue || 0));\nconst worst = list('current', 'campaign').slice().sort((a, b) => Number(b.spend || 0) - Number(a.spend || 0)).find((row) => Number(row.paid_bookings || row.paidBookings || 0) === 0) || campaigns[campaigns.length - 1] || null;\nreturn [{ json: {\n  windowLabel: 'last_24h', comparisonLabel: 'previous_7d_avg',\n  current: currentOverall,\n  bestCampaign: campaigns[0] ? { name: campaigns[0].campaign_name || campaigns[0].campaignName, roas: campaigns[0].roas } : null,\n  worstCampaign: worst ? { name: worst.campaign_name || worst.campaignName, spend: worst.spend, paidBookings: worst.paid_bookings || worst.paidBookings || 0, roas: worst.roas } : null,\n  bestRoute: routes[0] ? { name: routes[0].route_name || routes[0].routeName, netRevenue: routes[0].net_revenue || routes[0].netRevenue } : null,\n  worstRoute: routes[routes.length - 1] ? { name: routes[routes.length - 1].route_name || routes[routes.length - 1].routeName, netRevenue: routes[routes.length - 1].net_revenue || routes[routes.length - 1].netRevenue } : null,\n  alerts: input.alerts || [],\n  autoActionEnabled: String($env.AUTO_ACTION_ENABLED || 'false').toLowerCase() === 'true',\n} }];"
+      },
+      "id": "dr-kpi",
+      "name": "KPI Hesapla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        80
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json;\nreturn [{ json: Object.assign({}, payload, { anomalyCount: (payload.alerts || []).length }) }];"
+      },
+      "id": "dr-anom",
+      "name": "Anomali Kontrolü",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        80
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json;\nif (!String($env.OPENAI_API_KEY || '').trim()) {\n  return [{ json: Object.assign({}, payload, { aiStatus: 'NOT_CONFIGURED', code: 'OPENAI_NOT_CONFIGURED', report: { executiveSummary: 'AI analysis skipped: OPENAI_API_KEY is NOT_CONFIGURED.', topWinners: [], topProblems: [], budgetSuggestions: [], routeInsights: [], anomalies: [], actionsToday: [], risks: ['AI analyst is not configured.'] } }) }];\n}\nreturn [{ json: Object.assign({}, payload, { aiStatus: 'READY', prompt: JSON.stringify(payload) }) }];"
+      },
+      "id": "dr-ai-gate",
+      "name": "AI Hazırla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        80
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "ai-ready",
+              "leftValue": "={{ $json.aiStatus }}",
+              "rightValue": "READY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "dr-if-ai",
+      "name": "OpenAI Hazır mı",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1020,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Sen TicketGo Marketing Intelligence analistisin. TicketGo feribot/seyahat bileti satar. Ham tablo tekrarlama. Aksiyon üret. Reklam bütçesini otomatik değiştirme. AUTO_ACTION_ENABLED yalnızca echo. JSON dışında bir şey yazma. Keys: executiveSummary, topWinners, topProblems, budgetSuggestions, routeInsights, anomalies, actionsToday, risks."
+            },
+            {
+              "role": "user",
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        }
+      },
+      "id": "dr-ai",
+      "name": "AI Analizi",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1160,
+        40
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "TICKETGO_OPENAI",
+          "name": "TicketGo OpenAI"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('AI Hazırla').first().json;\nlet report = base.report;\nif (base.aiStatus === 'READY') {\n  const raw = $input.first().json.message && $input.first().json.message.content ? $input.first().json.message.content : ($input.first().json.text || $input.first().json.output || '');\n  try { report = JSON.parse(raw); } catch (e) { report = base.report || { executiveSummary: String(raw || '').slice(0, 2000), topWinners: [], topProblems: [], budgetSuggestions: [], routeInsights: [], anomalies: [], actionsToday: [], risks: [] }; }\n}\nconst packed = JSON.stringify(report || {}).replace(/'/g, \"''\");\nreturn [{ json: { reportDate: new Date().toISOString().slice(0, 10), windowHours: 24, autoActionEnabled: false, reportJson: packed, report: report } }];"
+      },
+      "id": "dr-save",
+      "name": "Raporu Kaydet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1480,
+        80
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO marketing.marketing_ai_reports (report_date, window_hours, model, auto_action_enabled, executive_summary, report_json)\nVALUES ('{{ $json.reportDate }}'::date, {{ Number($json.windowHours) }}, '{{ $env.OPENAI_MODEL || \"gpt-4o-mini\" }}', false, '{{ ($json.report && $json.report.executiveSummary || '').replace(/'/g, \"''\") }}', '{{ $json.reportJson }}'::jsonb)\nON CONFLICT (report_date, window_hours) DO UPDATE SET report_json = EXCLUDED.report_json, executive_summary = EXCLUDED.executive_summary, updated_at = NOW();"
+      },
+      "id": "dr-pg2",
+      "name": "PostgreSQL'e Kaydet",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1760,
+        80
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TICKETGO_MARKETING_POSTGRES",
+          "name": "TicketGo Marketing PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const err = $input.first().json;\nreturn [{ json: { source: 'daily_ai_report_v1', status: 'failed', errorCode: (err.error && err.error.code) || 'WORKFLOW_ERROR', errorMessage: String((err.error && err.error.message) || err.message || '').slice(0, 500), finishedAt: new Date().toISOString() } }];"
+      },
+      "id": "dr-err",
+      "name": "Hata Kaydı Oluştur",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        300
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Sabah Tetikleyici": {
+      "main": [
+        [
+          {
+            "node": "KPI Oku",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manuel Test": {
+      "main": [
+        [
+          {
+            "node": "KPI Oku",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KPI Oku": {
+      "main": [
+        [
+          {
+            "node": "KPI Hesapla",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hata Kaydı Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KPI Hesapla": {
+      "main": [
+        [
+          {
+            "node": "Anomali Kontrolü",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anomali Kontrolü": {
+      "main": [
+        [
+          {
+            "node": "AI Hazırla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Hazırla": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Hazır mı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Hazır mı": {
+      "main": [
+        [
+          {
+            "node": "AI Analizi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Raporu Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Analizi": {
+      "main": [
+        [
+          {
+            "node": "Raporu Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hata Kaydı Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Raporu Kaydet": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL'e Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

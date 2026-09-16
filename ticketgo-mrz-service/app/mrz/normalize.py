@@ -30,12 +30,12 @@ LETTER_CONFUSIONS = {
 
 
 def clean_mrz_text(text: str) -> str:
-    """Uppercase, strip spaces, keep only A-Z 0-9 <."""
+    """Uppercase, strip spaces, keep only A-Z 0-9 <. Never invent missing chars."""
     out: list[str] = []
     for ch in text.upper():
         if ch in (" ", "\t", "\n", "\r", "|"):
             continue
-        if ch == "«":
+        if ch in {"«", "»", "‹", "›", ">", "_"}:
             out.append("<")
             continue
         if ch in MRZ_CHARS:

@@ -90,10 +90,10 @@ def detect_mrz_band(image: np.ndarray) -> np.ndarray | None:
 def crop_regions(image: np.ndarray) -> list[tuple[str, np.ndarray]]:
     """
     Return image regions likely to contain MRZ.
-    Always includes full image, bottom bands, and detected MRZ crop when found.
+    Tight/bottom bands first; full page is last-resort only.
     """
     h, w = image.shape[:2]
-    regions: list[tuple[str, np.ndarray]] = [("full", image)]
+    regions: list[tuple[str, np.ndarray]] = []
 
     mrz_band = detect_mrz_band(image)
     if mrz_band is not None and mrz_band.size > 0:
@@ -115,6 +115,7 @@ def crop_regions(image: np.ndarray) -> list[tuple[str, np.ndarray]]:
     if x1 > x0:
         regions.append(("bottom_35_inset", image[y0:h, x0:x1]))
 
+    regions.append(("full", image))
     return regions
 
 

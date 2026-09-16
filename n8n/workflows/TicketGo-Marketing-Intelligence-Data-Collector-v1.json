@@ -1,0 +1,565 @@
+{
+  "name": "TicketGo - Marketing Intelligence - Data Collector v1",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Tetikleyiciler\\nSaatlik + manuel. Identity Verification akışına bağlama.",
+        "width": 420,
+        "height": 360,
+        "color": 5
+      },
+      "id": "dc-s1",
+      "name": "Grup Tetikleyiciler",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Kaynaklar\\nCredential yoksa NOT_CONFIGURED. Mock satış/reklam yok.",
+        "width": 980,
+        "height": 720,
+        "color": 6
+      },
+      "id": "dc-s2",
+      "name": "Grup Kaynaklar",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        220,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Normalizasyon ve kayıt\\nKaynak currency korunur. FX yok.",
+        "width": 520,
+        "height": 360,
+        "color": 4
+      },
+      "id": "dc-s3",
+      "name": "Grup Normalize",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Attribution / KPI / Anomali\\nEşleşme yoksa UNKNOWN.",
+        "width": 700,
+        "height": 360,
+        "color": 3
+      },
+      "id": "dc-s4",
+      "name": "Grup KPI",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1880,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Hata yönetimi\\nPII loglama. Retry tavanı 3.",
+        "width": 420,
+        "height": 280,
+        "color": 2
+      },
+      "id": "dc-s5",
+      "name": "Grup Hata",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2680,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "dc-schedule",
+      "name": "Saatlik Tetikleyici",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -520,
+        -40
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "dc-manual",
+      "name": "Manuel Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -520,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const hours = Number($env.MARKETING_SYNC_LOOKBACK_HOURS || 26);\nconst to = new Date();\nconst from = new Date(to.getTime() - hours * 3600 * 1000);\nreturn [{ json: {\n  from: from.toISOString(),\n  to: to.toISOString(),\n  fromDate: from.toISOString().slice(0, 10),\n  toDate: to.toISOString().slice(0, 10),\n  timezone: $env.MARKETING_TIMEZONE || 'Europe/Istanbul',\n  maxRetries: Number($env.MARKETING_MAX_RETRIES || 3),\n  retryBaseMs: Number($env.MARKETING_RETRY_BASE_MS || 30000),\n} }];"
+      },
+      "id": "dc-window",
+      "name": "Pencere Hazırla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        40
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "async function requestWithRetry(helpers, options, maxRetries, baseMs) {\n  let attempt = 0;\n  while (true) {\n    try {\n      const data = await helpers.httpRequest(options);\n      return data;\n    } catch (error) {\n      const status = error.statusCode || error.httpCode || error.status || error.response?.status;\n      const timeout = /timeout|ETIMEOUT|ETIMEDOUT/i.test(String(error.message || error.code || ''));\n      const retryable = timeout || status === 429 || (Number(status) >= 500 && Number(status) <= 599);\n      if (!retryable || attempt >= maxRetries) {\n        const err = new Error(error.message || 'HTTP request failed');\n        err.code = retryable ? 'AD_PLATFORM_SYNC_FAILURE' : String(status || 'HTTP_ERROR');\n        err.retryable = Boolean(retryable);\n        throw err;\n      }\n      await new Promise((resolve) => setTimeout(resolve, baseMs * Math.pow(2, attempt)));\n      attempt += 1;\n    }\n  }\n}\n\nconst customerId = String($env.GOOGLE_ADS_CUSTOMER_ID || '').trim();\nconst devToken = String($env.GOOGLE_ADS_DEVELOPER_TOKEN || '').trim();\nif (!customerId || !devToken) {\n  return [{ json: { source: 'google_ads', status: 'NOT_CONFIGURED', code: 'GOOGLE_ADS_NOT_CONFIGURED', records: [], recordsFetched: 0 } }];\n}\nconst window = $('Pencere Hazırla').first().json;\nconst query = \"SELECT segments.date, customer.id, campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group_ad.ad.id, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value FROM ad_group_ad WHERE segments.date BETWEEN '\" + window.fromDate + \"' AND '\" + window.toDate + \"'\";\nconst data = await requestWithRetry(this.helpers, {\n  method: 'POST',\n  url: 'https://googleads.googleapis.com/v18/customers/' + customerId + '/googleAds:search',\n  headers: { 'developer-token': devToken, 'Content-Type': 'application/json' },\n  body: { query },\n  json: true,\n}, window.maxRetries, window.retryBaseMs);\nconst records = (data.results || []).map((row) => ({\n  date: row.segments && row.segments.date,\n  accountId: String((row.customer && row.customer.id) || customerId),\n  campaignId: String((row.campaign && row.campaign.id) || ''),\n  campaignName: (row.campaign && row.campaign.name) || '',\n  adGroupId: String((row.adGroup && row.adGroup.id) || ''),\n  adGroupName: (row.adGroup && row.adGroup.name) || '',\n  adId: String((row.adGroupAd && row.adGroupAd.ad && row.adGroupAd.ad.id) || ''),\n  impressions: Number((row.metrics && row.metrics.impressions) || 0),\n  clicks: Number((row.metrics && row.metrics.clicks) || 0),\n  cost: Number((row.metrics && row.metrics.costMicros) || 0) / 1000000,\n  conversions: Number((row.metrics && row.metrics.conversions) || 0),\n  conversionValue: Number((row.metrics && row.metrics.conversionsValue) || 0),\n  currency: (row.customer && row.customer.currencyCode) || '',\n})).filter((row) => row.date && row.campaignId && row.adId);\nreturn [{ json: { source: 'google_ads', status: 'OK', records, recordsFetched: records.length } }];"
+      },
+      "id": "dc-google",
+      "name": "Google Ads Verisini Al",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        -160
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "async function requestWithRetry(helpers, options, maxRetries, baseMs) {\n  let attempt = 0;\n  while (true) {\n    try {\n      const data = await helpers.httpRequest(options);\n      return data;\n    } catch (error) {\n      const status = error.statusCode || error.httpCode || error.status || error.response?.status;\n      const timeout = /timeout|ETIMEOUT|ETIMEDOUT/i.test(String(error.message || error.code || ''));\n      const retryable = timeout || status === 429 || (Number(status) >= 500 && Number(status) <= 599);\n      if (!retryable || attempt >= maxRetries) {\n        const err = new Error(error.message || 'HTTP request failed');\n        err.code = retryable ? 'AD_PLATFORM_SYNC_FAILURE' : String(status || 'HTTP_ERROR');\n        err.retryable = Boolean(retryable);\n        throw err;\n      }\n      await new Promise((resolve) => setTimeout(resolve, baseMs * Math.pow(2, attempt)));\n      attempt += 1;\n    }\n  }\n}\n\nconst accountId = String($env.META_AD_ACCOUNT_ID || '').trim();\nconst token = String($env.META_ACCESS_TOKEN || '').trim();\nconst version = String($env.META_API_VERSION || 'v21.0').trim();\nif (!accountId || !token) {\n  return [{ json: { source: 'meta_ads', status: 'NOT_CONFIGURED', code: 'META_ADS_NOT_CONFIGURED', records: [], recordsFetched: 0 } }];\n}\nconst window = $('Pencere Hazırla').first().json;\nconst data = await requestWithRetry(this.helpers, {\n  method: 'GET',\n  url: 'https://graph.facebook.com/' + version + '/act_' + accountId + '/insights',\n  qs: {\n    access_token: token,\n    level: 'ad',\n    time_increment: 1,\n    time_range: JSON.stringify({ since: window.fromDate, until: window.toDate }),\n    fields: 'campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,impressions,clicks,spend,reach,actions,action_values,account_currency',\n  },\n  json: true,\n}, window.maxRetries, window.retryBaseMs);\nfunction actionVal(row, key) {\n  const list = row[key] || [];\n  const found = list.find((item) => item.action_type === 'purchase' || item.action_type === 'omni_purchase');\n  return found ? Number(found.value || 0) : 0;\n}\nconst records = (data.data || []).map((row) => ({\n  date: row.date_start,\n  accountId,\n  campaignId: String(row.campaign_id || ''),\n  campaignName: row.campaign_name || '',\n  adSetId: String(row.adset_id || ''),\n  adSetName: row.adset_name || '',\n  adId: String(row.ad_id || ''),\n  adName: row.ad_name || '',\n  impressions: Number(row.impressions || 0),\n  clicks: Number(row.clicks || 0),\n  spend: Number(row.spend || 0),\n  reach: Number(row.reach || 0),\n  conversions: actionVal(row, 'actions'),\n  purchaseValue: actionVal(row, 'action_values'),\n  currency: row.account_currency || '',\n})).filter((row) => row.date && row.campaignId && row.adId);\nreturn [{ json: { source: 'meta_ads', status: 'OK', records, recordsFetched: records.length } }];"
+      },
+      "id": "dc-meta",
+      "name": "Meta Ads Verisini Al",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        40
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "async function requestWithRetry(helpers, options, maxRetries, baseMs) {\n  let attempt = 0;\n  while (true) {\n    try {\n      const data = await helpers.httpRequest(options);\n      return data;\n    } catch (error) {\n      const status = error.statusCode || error.httpCode || error.status || error.response?.status;\n      const timeout = /timeout|ETIMEOUT|ETIMEDOUT/i.test(String(error.message || error.code || ''));\n      const retryable = timeout || status === 429 || (Number(status) >= 500 && Number(status) <= 599);\n      if (!retryable || attempt >= maxRetries) {\n        const err = new Error(error.message || 'HTTP request failed');\n        err.code = retryable ? 'AD_PLATFORM_SYNC_FAILURE' : String(status || 'HTTP_ERROR');\n        err.retryable = Boolean(retryable);\n        throw err;\n      }\n      await new Promise((resolve) => setTimeout(resolve, baseMs * Math.pow(2, attempt)));\n      attempt += 1;\n    }\n  }\n}\n\nconst propertyId = String($env.GA4_PROPERTY_ID || '').trim();\nif (!propertyId) {\n  return [{ json: { source: 'ga4', status: 'NOT_CONFIGURED', code: 'GA4_NOT_CONFIGURED', records: [], recordsFetched: 0 } }];\n}\nconst window = $('Pencere Hazırla').first().json;\nconst data = await requestWithRetry(this.helpers, {\n  method: 'POST',\n  url: 'https://analyticsdata.googleapis.com/v1beta/properties/' + propertyId + ':runReport',\n  headers: { 'Content-Type': 'application/json' },\n  body: {\n    dateRanges: [{ startDate: window.fromDate, endDate: window.toDate }],\n    dimensions: [{ name: 'date' }, { name: 'sessionSource' }, { name: 'sessionMedium' }, { name: 'sessionCampaignName' }, { name: 'sessionCampaignId' }, { name: 'landingPagePlusQueryString' }, { name: 'deviceCategory' }, { name: 'country' }],\n    metrics: [{ name: 'totalUsers' }, { name: 'sessions' }, { name: 'engagedSessions' }, { name: 'keyEvents' }, { name: 'purchaseRevenue' }],\n  },\n  json: true,\n}, window.maxRetries, window.retryBaseMs);\nconst records = (data.rows || []).map((row) => {\n  const d = (row.dimensionValues || []).map((x) => x.value);\n  const m = (row.metricValues || []).map((x) => Number(x.value || 0));\n  const rawDate = d[0] || '';\n  const date = rawDate.length === 8 ? rawDate.slice(0, 4) + '-' + rawDate.slice(4, 6) + '-' + rawDate.slice(6, 8) : window.fromDate;\n  return { date, sessionSource: d[1], sessionMedium: d[2], campaignName: d[3], campaignId: d[4], users: m[0], sessions: m[1], engagedSessions: m[2], keyEvents: m[3], revenue: m[4], landingPage: d[5], deviceCategory: d[6], country: d[7] };\n});\nreturn [{ json: { source: 'ga4', status: 'OK', records, recordsFetched: records.length } }];"
+      },
+      "id": "dc-ga4",
+      "name": "GA4 Verisini Al",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        240
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "async function requestWithRetry(helpers, options, maxRetries, baseMs) {\n  let attempt = 0;\n  while (true) {\n    try {\n      const data = await helpers.httpRequest(options);\n      return data;\n    } catch (error) {\n      const status = error.statusCode || error.httpCode || error.status || error.response?.status;\n      const timeout = /timeout|ETIMEOUT|ETIMEDOUT/i.test(String(error.message || error.code || ''));\n      const retryable = timeout || status === 429 || (Number(status) >= 500 && Number(status) <= 599);\n      if (!retryable || attempt >= maxRetries) {\n        const err = new Error(error.message || 'HTTP request failed');\n        err.code = retryable ? 'AD_PLATFORM_SYNC_FAILURE' : String(status || 'HTTP_ERROR');\n        err.retryable = Boolean(retryable);\n        throw err;\n      }\n      await new Promise((resolve) => setTimeout(resolve, baseMs * Math.pow(2, attempt)));\n      attempt += 1;\n    }\n  }\n}\n\nconst base = String($env.TICKETGO_API_BASE_URL || '').replace(/\\/+$/, '');\nconst apiKey = String($env.TICKETGO_INTERNAL_API_KEY || '').trim();\nif (!base || !apiKey) {\n  return [{ json: { source: 'ticketgo', status: 'NOT_CONFIGURED', code: 'TICKETGO_API_NOT_CONFIGURED', records: [], recordsFetched: 0 } }];\n}\nconst window = $('Pencere Hazırla').first().json;\nconst data = await requestWithRetry(this.helpers, {\n  method: 'GET',\n  url: base + '/internal/marketing/sales',\n  qs: { from: window.from, to: window.to },\n  headers: { 'X-API-Key': apiKey, Accept: 'application/json' },\n  json: true,\n}, window.maxRetries, window.retryBaseMs);\nconst records = Array.isArray(data && data.bookings) ? data.bookings : [];\nreturn [{ json: { source: 'ticketgo', status: 'OK', records, recordsFetched: records.length } }];"
+      },
+      "id": "dc-tg",
+      "name": "TicketGo Satışlarını Al",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        440
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "numberInputs": 4,
+        "options": {}
+      },
+      "id": "dc-merge",
+      "name": "Kaynakları Birleştir",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        780,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function isoDate(value) {\n  if (!value) return null;\n  const text = String(value);\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(text)) return text;\n  const parsed = new Date(text);\n  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);\n}\nfunction num(value) { const n = Number(value); return Number.isFinite(n) ? n : 0; }\nconst inputs = $input.all().map((item) => item.json);\nconst google = inputs.find((row) => row.source === 'google_ads') || { status: 'NOT_CONFIGURED', records: [] };\nconst meta = inputs.find((row) => row.source === 'meta_ads') || { status: 'NOT_CONFIGURED', records: [] };\nconst ga4 = inputs.find((row) => row.source === 'ga4') || { status: 'NOT_CONFIGURED', records: [] };\nconst sales = inputs.find((row) => row.source === 'ticketgo') || { status: 'NOT_CONFIGURED', records: [] };\nconst ads = [];\nfor (const row of google.records || []) {\n  ads.push({ platform: 'google_ads', date: isoDate(row.date), accountId: String(row.accountId), campaignId: String(row.campaignId), campaignName: row.campaignName || null, adGroupId: row.adGroupId || null, adGroupName: row.adGroupName || null, adId: String(row.adId), adName: null, impressions: num(row.impressions), clicks: num(row.clicks), spend: num(row.cost), conversions: num(row.conversions), reportedRevenue: num(row.conversionValue), currency: String(row.currency || '').toUpperCase() });\n}\nfor (const row of meta.records || []) {\n  ads.push({ platform: 'meta_ads', date: isoDate(row.date), accountId: String(row.accountId), campaignId: String(row.campaignId), campaignName: row.campaignName || null, adGroupId: row.adSetId || null, adGroupName: row.adSetName || null, adId: String(row.adId), adName: row.adName || null, impressions: num(row.impressions), clicks: num(row.clicks), spend: num(row.spend), conversions: num(row.conversions), reportedRevenue: num(row.purchaseValue), currency: String(row.currency || '').toUpperCase(), reach: num(row.reach) });\n}\nreturn [{ json: { sources: { google_ads: google, meta_ads: meta, ga4: ga4, ticketgo: sales }, ads, analytics: ga4.records || [], bookings: sales.records || [] } }];"
+      },
+      "id": "dc-norm",
+      "name": "Veriyi Normalize Et",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        120
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "function present(value) { return Boolean(value && String(value).trim()); }\nfunction attribute(booking, campaigns) {\n  if (present(booking.gclid)) return { attributionPlatform: 'google_ads', attributionCampaignId: null, attributionCampaignName: null, attributionMethod: 'GCLID', attributionConfidence: 0.7 };\n  if (present(booking.gbraid)) return { attributionPlatform: 'google_ads', attributionCampaignId: null, attributionCampaignName: null, attributionMethod: 'GBRAID', attributionConfidence: 0.65 };\n  if (present(booking.wbraid)) return { attributionPlatform: 'google_ads', attributionCampaignId: null, attributionCampaignName: null, attributionMethod: 'WBRAID', attributionConfidence: 0.65 };\n  if (present(booking.fbclid)) return { attributionPlatform: 'meta_ads', attributionCampaignId: null, attributionCampaignName: null, attributionMethod: 'FBCLID', attributionConfidence: 0.7 };\n  if (present(booking.utmCampaign) && present(booking.utmSource)) {\n    const campaignNorm = String(booking.utmCampaign).trim().toLowerCase();\n    const mapped = (campaigns || []).find((row) => String(row.campaignName || '').trim().toLowerCase() === campaignNorm || String(row.campaignId || '').trim().toLowerCase() === campaignNorm);\n    if (!mapped) return { attributionPlatform: 'unknown', attributionCampaignId: null, attributionCampaignName: null, attributionMethod: 'UNKNOWN', attributionConfidence: 0 };\n    return { attributionPlatform: mapped.platform, attributionCampaignId: mapped.campaignId, attributionCampaignName: mapped.campaignName, attributionMethod: 'UTM', attributionConfidence: 0.8 };\n  }\n  const source = String(booking.utmSource || '').trim().toLowerCase();\n  const medium = String(booking.utmMedium || '').trim().toLowerCase();\n  if (source === 'organic' || medium === 'organic') return { attributionPlatform: 'organic', attributionCampaignId: null, attributionCampaignName: null, attributionMethod: 'ORGANIC', attributionConfidence: 0.6 };\n  if (source === 'direct' || source === '(direct)' || medium === '(none)' || medium === 'none') return { attributionPlatform: 'direct', attributionCampaignId: null, attributionCampaignName: null, attributionMethod: 'DIRECT', attributionConfidence: 0.5 };\n  return { attributionPlatform: 'unknown', attributionCampaignId: null, attributionCampaignName: null, attributionMethod: 'UNKNOWN', attributionConfidence: 0 };\n}\nconst payload = $input.first().json;\nconst campaigns = (payload.ads || []).map((row) => ({ platform: row.platform, campaignId: row.campaignId, campaignName: row.campaignName }));\nconst bookings = (payload.bookings || []).map((booking) => ({ ...booking, attribution: attribute(booking, campaigns) }));\nreturn [{ json: { ...payload, bookings } }];"
+      },
+      "id": "dc-attr",
+      "name": "Attribution Hesapla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        120
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "function safeRatio(n, d) { if (!Number.isFinite(n) || !Number.isFinite(d) || d === 0) return null; return n / d; }\nfunction compute(input) {\n  const paid = input.paidBookings;\n  return Object.assign({}, input, {\n    ctr: safeRatio(input.clicks, input.impressions), cpc: safeRatio(input.spend, input.clicks), cpm: safeRatio(input.spend * 1000, input.impressions),\n    cpa: safeRatio(input.spend, paid), cac: safeRatio(input.spend, paid), roas: safeRatio(input.grossRevenue, input.spend), netRoas: safeRatio(input.netRevenue, input.spend), mer: safeRatio(input.netRevenue, input.spend),\n    conversionRate: safeRatio(paid, input.clicks), refundRate: safeRatio(input.refundedBookings, paid), cancellationRate: safeRatio(input.cancelledBookings, input.bookings),\n    averageOrderValue: safeRatio(input.grossRevenue, paid), revenuePerBooking: safeRatio(input.netRevenue, paid), commissionPerBooking: safeRatio(input.commissionRevenue, paid),\n  });\n}\nfunction empty() { return { spend: 0, impressions: 0, clicks: 0, bookings: 0, paidBookings: 0, cancelledBookings: 0, refundedBookings: 0, ticketsSold: 0, passengers: 0, grossRevenue: 0, netRevenue: 0, commissionRevenue: 0, refundAmount: 0, currency: null }; }\nfunction add(a, b) { return { spend: a.spend + b.spend, impressions: a.impressions + b.impressions, clicks: a.clicks + b.clicks, bookings: a.bookings + b.bookings, paidBookings: a.paidBookings + b.paidBookings, cancelledBookings: a.cancelledBookings + b.cancelledBookings, refundedBookings: a.refundedBookings + b.refundedBookings, ticketsSold: a.ticketsSold + b.ticketsSold, passengers: a.passengers + b.passengers, grossRevenue: a.grossRevenue + b.grossRevenue, netRevenue: a.netRevenue + b.netRevenue, commissionRevenue: a.commissionRevenue + b.commissionRevenue, refundAmount: a.refundAmount + b.refundAmount, currency: a.currency || b.currency }; }\nconst payload = $input.first().json;\nconst byKey = new Map();\nfunction bump(grain, dimensionKey, extra, delta) {\n  const key = grain + '::' + dimensionKey;\n  const current = byKey.get(key) || Object.assign({ grain: grain, dimensionKey: dimensionKey }, extra, empty());\n  byKey.set(key, Object.assign({}, current, extra, add(current, delta)));\n}\nfor (const ad of payload.ads || []) {\n  const delta = Object.assign(empty(), { spend: Number(ad.spend || 0), impressions: Number(ad.impressions || 0), clicks: Number(ad.clicks || 0), currency: ad.currency });\n  bump('overall', 'overall', { date: ad.date }, delta);\n  bump('platform', ad.platform, { date: ad.date, platform: ad.platform }, delta);\n  bump('campaign', ad.platform + '::' + ad.campaignId, { date: ad.date, platform: ad.platform, campaignId: ad.campaignId, campaignName: ad.campaignName }, delta);\n  bump('ad', ad.platform + '::' + ad.campaignId + '::' + ad.adId, { date: ad.date, platform: ad.platform, campaignId: ad.campaignId, adId: ad.adId }, delta);\n  bump('date', ad.date, { date: ad.date }, delta);\n}\nfor (const booking of payload.bookings || []) {\n  const status = String(booking.bookingStatus || '').toLowerCase();\n  const paid = status === 'paid';\n  const tickets = paid ? Number(booking.adultCount || 0) + Number(booking.childCount || 0) + Number(booking.infantCount || 0) : 0;\n  const delta = Object.assign(empty(), { bookings: 1, paidBookings: paid ? 1 : 0, cancelledBookings: status === 'cancelled' ? 1 : 0, refundedBookings: status === 'refunded' ? 1 : 0, ticketsSold: tickets, passengers: tickets, grossRevenue: paid ? Number(booking.grossRevenue || 0) : 0, netRevenue: paid ? Number(booking.netRevenue || 0) : 0, commissionRevenue: paid ? Number(booking.commissionRevenue || 0) : 0, refundAmount: Number(booking.refundAmount || 0), currency: booking.currency });\n  const date = String(booking.paidAt || booking.createdAt || '').slice(0, 10);\n  const attr = booking.attribution || {};\n  bump('overall', 'overall', { date: date }, delta);\n  bump('route', booking.routeId || '_', { date: date, routeId: booking.routeId, routeName: booking.routeName }, delta);\n  bump('departure_port', booking.departurePort || '_', { date: date, departurePort: booking.departurePort }, delta);\n  bump('arrival_port', booking.arrivalPort || '_', { date: date, arrivalPort: booking.arrivalPort }, delta);\n  bump('operator', booking.operatorId || '_', { date: date, operatorId: booking.operatorId }, delta);\n  bump('country', booking.country || '_', { date: date, country: booking.country }, delta);\n  bump('device', booking.device || '_', { date: date, device: booking.device }, delta);\n  if (attr.attributionPlatform) bump('platform', attr.attributionPlatform, { date: date, platform: attr.attributionPlatform }, delta);\n  if (attr.attributionCampaignId) bump('campaign', (attr.attributionPlatform || 'unknown') + '::' + attr.attributionCampaignId, { date: date, platform: attr.attributionPlatform, campaignId: attr.attributionCampaignId, campaignName: attr.attributionCampaignName }, delta);\n}\nreturn [{ json: Object.assign({}, payload, { kpis: Array.from(byKey.values()).map(compute) }) }];"
+      },
+      "id": "dc-kpi",
+      "name": "KPI Hesapla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        120
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json;\nconst now = new Date().toISOString();\nconst overall = (payload.kpis || []).find((row) => row.grain === 'overall') || { spend: 0 };\nconst alerts = [];\nconst sources = payload.sources || {};\nif (sources.ticketgo && sources.ticketgo.status !== 'OK') {\n  alerts.push({ severity: 'CRITICAL', category: 'DATA_SOURCE_FAILURE', platform: 'ticketgo', campaignId: null, routeId: null, message: 'TicketGo sales API did not return data (NOT_CONFIGURED or sync failure).', metric: null, currentValue: null, baselineValue: null, detectedAt: now, fingerprint: 'DATA_SOURCE_FAILURE|ticketgo' });\n}\nfor (const key of ['google_ads', 'meta_ads', 'ga4']) {\n  if (sources[key] && sources[key].status === 'ERROR') {\n    alerts.push({ severity: 'CRITICAL', category: 'AD_PLATFORM_SYNC_FAILURE', platform: key, campaignId: null, routeId: null, message: sources[key].message || 'Ad platform sync failed', metric: null, currentValue: null, baselineValue: null, detectedAt: now, fingerprint: 'AD_PLATFORM_SYNC_FAILURE|' + key });\n  }\n}\nconst paid = (payload.bookings || []).filter((row) => String(row.bookingStatus || '').toLowerCase() === 'paid');\nlet hoursSince = null;\nif (paid.length) {\n  const last = paid.map((row) => new Date(row.paidAt || row.createdAt).getTime()).filter((n) => Number.isFinite(n)).sort((a, b) => b - a)[0];\n  if (last) hoursSince = (Date.now() - last) / 3600000;\n}\nif (overall.spend > 0 && hoursSince != null && hoursSince >= 3) {\n  alerts.push({ severity: 'CRITICAL', category: 'NO_SALES_WITH_SPEND', platform: null, campaignId: null, routeId: null, message: 'Spend continues but no paid booking for ' + hoursSince.toFixed(1) + ' hours.', metric: 'hoursSinceLastPaidBooking', currentValue: hoursSince, baselineValue: 3, detectedAt: now, fingerprint: 'NO_SALES_WITH_SPEND' });\n}\nreturn [{ json: Object.assign({}, payload, { alerts: alerts, detectedAt: now }) }];"
+      },
+      "id": "dc-anom",
+      "name": "Anomali Kontrolü",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        120
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.OPENAI_MODEL || \"gpt-4o-mini\" }}"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Collector no-op. Daily Report workflow runs analysis."
+            },
+            {
+              "role": "user",
+              "content": "disabled"
+            }
+          ]
+        }
+      },
+      "id": "dc-ai",
+      "name": "AI Analizi",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        2060,
+        340
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json;\nconst sources = payload.sources || {};\nconst parts = Object.values(sources);\nconst fetched = parts.reduce((sum, row) => sum + Number(row.recordsFetched || 0), 0);\nconst hasOk = parts.some((row) => row.status === 'OK');\nconst hasFail = parts.some((row) => row.status === 'ERROR');\nconst hasSkip = parts.some((row) => row.status === 'NOT_CONFIGURED');\nlet status = 'success';\nif (!hasOk && hasSkip && !hasFail) status = 'not_configured';\nelse if (hasFail && !hasOk) status = 'failed';\nelse if (hasFail || hasSkip) status = 'partial';\nfunction pack(value) { return JSON.stringify(value || []).replace(/'/g, \"''\"); }\nreturn [{ json: Object.assign({}, payload, { sync: { source: 'data_collector_v1', status: status, recordsFetched: fetched, recordsInserted: (payload.ads || []).length + (payload.bookings || []).length + (payload.kpis || []).length, recordsUpdated: 0, errorCode: (!hasOk && hasSkip) ? ((sources.ticketgo && sources.ticketgo.code) || 'NOT_CONFIGURED') : (hasFail ? 'AD_PLATFORM_SYNC_FAILURE' : null), errorMessage: null, retryCount: 0 }, adsJson: pack(payload.ads), bookingsJson: pack(payload.bookings), kpisJson: pack(payload.kpis), alertsJson: pack(payload.alerts), analyticsJson: pack(payload.analytics) }) }];"
+      },
+      "id": "dc-report",
+      "name": "Raporu Kaydet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2380,
+        120
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO marketing.marketing_sync_runs (source, started_at, finished_at, status, records_fetched, records_inserted, records_updated, error_code, error_message, retry_count)\nVALUES (\n  'data_collector_v1', NOW(), NOW(),\n  '{{ $json.sync.status }}',\n  {{ Number($json.sync.recordsFetched || 0) }},\n  {{ Number($json.sync.recordsInserted || 0) }},\n  {{ Number($json.sync.recordsUpdated || 0) }},\n  NULLIF('{{ $json.sync.errorCode || '' }}', ''),\n  NULL,\n  {{ Number($json.sync.retryCount || 0) }}\n);\n\nINSERT INTO marketing.marketing_ads_daily (\n  platform, date, account_id, campaign_id, campaign_name, ad_group_id, ad_group_name, ad_id, ad_name,\n  impressions, clicks, spend, conversions, reported_revenue, reach, currency\n)\nSELECT\n  (e->>'platform')::marketing.platform,\n  (e->>'date')::date,\n  e->>'accountId', e->>'campaignId', e->>'campaignName', e->>'adGroupId', e->>'adGroupName', e->>'adId', e->>'adName',\n  COALESCE((e->>'impressions')::bigint, 0), COALESCE((e->>'clicks')::bigint, 0), COALESCE((e->>'spend')::numeric, 0),\n  COALESCE((e->>'conversions')::numeric, 0), COALESCE((e->>'reportedRevenue')::numeric, 0),\n  NULLIF(e->>'reach','')::bigint, COALESCE(e->>'currency', 'XXX')\nFROM jsonb_array_elements('{{ $json.adsJson }}'::jsonb) AS e\nWHERE COALESCE(e->>'date','') <> '' AND COALESCE(e->>'campaignId','') <> '' AND COALESCE(e->>'adId','') <> ''\nON CONFLICT (platform, date, account_id, campaign_id, ad_id) DO UPDATE SET\n  campaign_name = EXCLUDED.campaign_name, ad_group_id = EXCLUDED.ad_group_id, ad_group_name = EXCLUDED.ad_group_name,\n  ad_name = EXCLUDED.ad_name, impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks, spend = EXCLUDED.spend,\n  conversions = EXCLUDED.conversions, reported_revenue = EXCLUDED.reported_revenue, reach = EXCLUDED.reach,\n  currency = EXCLUDED.currency, updated_at = NOW();",
+        "options": {}
+      },
+      "id": "dc-pg",
+      "name": "PostgreSQL'e Kaydet",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2700,
+        120
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TICKETGO_MARKETING_POSTGRES",
+          "name": "TicketGo Marketing PostgreSQL"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const err = $input.first().json;\nconst raw = String((err.error && err.error.message) || err.message || 'Workflow error').slice(0, 500);\nconst errorMessage = raw.replace(/passport|tckn|email|phone|\\+\\d{10,}/gi, '[redacted]');\nreturn [{ json: { source: 'data_collector_v1', status: 'failed', errorCode: (err.error && err.error.code) || err.code || 'WORKFLOW_ERROR', errorMessage: errorMessage, recordsFetched: 0, recordsInserted: 0, recordsUpdated: 0, finishedAt: new Date().toISOString() } }];"
+      },
+      "id": "dc-err",
+      "name": "Hata Kaydı Oluştur",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2700,
+        520
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Saatlik Tetikleyici": {
+      "main": [
+        [
+          {
+            "node": "Pencere Hazırla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manuel Test": {
+      "main": [
+        [
+          {
+            "node": "Pencere Hazırla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pencere Hazırla": {
+      "main": [
+        [
+          {
+            "node": "Google Ads Verisini Al",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Meta Ads Verisini Al",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GA4 Verisini Al",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "TicketGo Satışlarını Al",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Ads Verisini Al": {
+      "main": [
+        [
+          {
+            "node": "Kaynakları Birleştir",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hata Kaydı Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta Ads Verisini Al": {
+      "main": [
+        [
+          {
+            "node": "Kaynakları Birleştir",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Hata Kaydı Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 Verisini Al": {
+      "main": [
+        [
+          {
+            "node": "Kaynakları Birleştir",
+            "type": "main",
+            "index": 2
+          }
+        ],
+        [
+          {
+            "node": "Hata Kaydı Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TicketGo Satışlarını Al": {
+      "main": [
+        [
+          {
+            "node": "Kaynakları Birleştir",
+            "type": "main",
+            "index": 3
+          }
+        ],
+        [
+          {
+            "node": "Hata Kaydı Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kaynakları Birleştir": {
+      "main": [
+        [
+          {
+            "node": "Veriyi Normalize Et",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Veriyi Normalize Et": {
+      "main": [
+        [
+          {
+            "node": "Attribution Hesapla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attribution Hesapla": {
+      "main": [
+        [
+          {
+            "node": "KPI Hesapla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KPI Hesapla": {
+      "main": [
+        [
+          {
+            "node": "Anomali Kontrolü",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anomali Kontrolü": {
+      "main": [
+        [
+          {
+            "node": "Raporu Kaydet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Analizi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Raporu Kaydet": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL'e Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostgreSQL'e Kaydet": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Hata Kaydı Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
