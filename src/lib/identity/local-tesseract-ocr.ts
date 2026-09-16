@@ -7,6 +7,14 @@ import path from 'path';
 import { promisify } from 'util';
 import sharp from 'sharp';
 import { createWorker, type Worker } from 'tesseract.js';
+import {
+  cropFieldRoiRaw,
+  preprocessTcIdCard,
+  writeTcIdDebugImages,
+  type CardPreprocessMeta,
+  type FieldRoiKey,
+  TC_FIELD_ROIS,
+} from '@/lib/identity/card-preprocess';
 
 const execFileAsync = promisify(execFile);
 
@@ -236,14 +244,21 @@ async function runNative(imageJpeg: Buffer, psm: string, whitelist?: string): Pr
   }
 }
 
-async function runJs(imageJpeg: Buffer, psm: string): Promise<string> {
+async function runJsRecognize(imageJpeg: Buffer, psm: string): Promise<{ text: string; confidence: number }> {
   const worker = await getJsWorker();
   await worker.setParameters({
     tessedit_pageseg_mode: psm as unknown as never,
     preserve_interword_spaces: '1',
   });
   const result = await worker.recognize(imageJpeg);
-  return String(result.data.text || '');
+  const confidenceRaw = typeof result.data.confidence === 'number' ? result.data.confidence : 0;
+  // tesseract.js reports confidence on a 0-100 scale.
+  return { text: String(result.data.text || ''), confidence: Math.max(0, Math.min(1, confidenceRaw / 100)) };
+}
+
+async function runJs(imageJpeg: Buffer, psm: string): Promise<string> {
+  const { text } = await runJsRecognize(imageJpeg, psm);
+  return text;
 }
 
 function toLines(text: string): string[] {
@@ -253,65 +268,78 @@ function toLines(text: string): string[] {
     .filter(Boolean);
 }
 
-export type LocalOcrResult = {
-  lines: string[];
+/** Per-ROI OCR result — text + confidence for one of the five calibrated
+ *  T.C. kimlik ön yüz field regions defined in card-preprocess.ts. */
+export type FieldRoiOcr = {
+  key: FieldRoiKey;
   text: string;
-  ms: number;
+  confidence: number;
+};
+
+export type LocalOcrResult = {
   engine: 'native+js' | 'tesseract.js';
-  cardCropped: boolean;
-  cardJpeg: Buffer;
+  fieldRois: FieldRoiOcr[];
+  meta: CardPreprocessMeta;
+  debugDir: string;
 };
 
 export type FieldCropKind = 'tc' | 'dob' | 'name' | 'gender';
 
 /**
- * Local OCR for T.C. kimlik ön yüz — card crop + full + name band.
+ * Local OCR for T.C. kimlik ön yüz.
+ *
+ * Uses the calibrated card detection / perspective-normalization /
+ * per-field ROI geometry from card-preprocess.ts (preprocessTcIdCard,
+ * TC_FIELD_ROIS, cropFieldRoiRaw, writeTcIdDebugImages) — that module
+ * already computed the right card meta and ROI boxes, it just was not
+ * wired into this function yet.
+ *
+ * Each ROI's confidence always comes from a genuine tesseract.js
+ * recognize() pass (result.data.confidence). The native tesseract.exe CLI
+ * path (when available) is used only to try to improve the recognized
+ * TEXT for a region — its plain-text output has no per-word confidence,
+ * so it is never used to invent a confidence score.
  */
 export async function recognizeTcIdFrontLocal(imageBytes: Buffer): Promise<LocalOcrResult> {
-  const t0 = Date.now();
-  const { jpeg: cardJpeg, cropped } = await cropAndEnhanceCard(imageBytes);
+  const { cardJpeg, originalJpeg, detectedJpeg, meta } = await preprocessTcIdCard(imageBytes);
 
-  const fullGray = await sharp(cardJpeg).grayscale().normalize().jpeg({ quality: 90 }).toBuffer();
-  const nameBand = await extractRelativeCrop(cardJpeg, FIELD_CROPS.name);
-  const tcBand = await extractRelativeCrop(cardJpeg, FIELD_CROPS.tc);
-  const tcAlt = await extractRelativeCrop(cardJpeg, FIELD_CROPS.tcAlt);
+  const nativeAvailable = Boolean(resolveNative());
+  const engine: 'native+js' | 'tesseract.js' = nativeAvailable ? 'native+js' : 'tesseract.js';
 
-  const lines: string[] = [];
-  let engine: 'native+js' | 'tesseract.js' = 'tesseract.js';
+  const keys = Object.keys(TC_FIELD_ROIS) as FieldRoiKey[];
+  const fieldRois: FieldRoiOcr[] = await Promise.all(
+    keys.map(async (key) => {
+      const crop = await cropFieldRoiRaw(cardJpeg, meta.width, meta.height, key);
+      const psm = key === 'tcNo' || key === 'dogumTarihi' ? '7' : '6';
 
-  if (resolveNative()) {
-    engine = 'native+js';
-    const [fullText, nameText, tcText, tcAltText, jsName] = await Promise.all([
-      runNative(fullGray, '6'),
-      runNative(nameBand, '6'),
-      runNative(tcBand, '7', '0123456789'),
-      runNative(tcAlt, '7', '0123456789'),
-      runJs(nameBand, '6'),
-    ]);
-    lines.push(...toLines(nameText), ...toLines(jsName), ...toLines(tcText), ...toLines(tcAltText), ...toLines(fullText));
-  } else {
-    const worker = await getJsWorker();
-    const [full, name, tc] = await Promise.all([
-      worker.recognize(fullGray),
-      worker.recognize(nameBand),
-      worker.recognize(tcBand),
-    ]);
-    lines.push(
-      ...toLines(String(name.data.text || '')),
-      ...toLines(String(tc.data.text || '')),
-      ...toLines(String(full.data.text || '')),
-    );
-  }
+      const js = await runJsRecognize(crop, psm);
+      let text = js.text;
 
-  return {
-    lines,
-    text: lines.join('\n'),
-    ms: Date.now() - t0,
-    engine,
-    cardCropped: cropped,
+      if (nativeAvailable) {
+        const whitelist = key === 'tcNo' ? '0123456789' : key === 'dogumTarihi' ? '0123456789./-' : undefined;
+        try {
+          const nativeText = await runNative(crop, psm, whitelist);
+          if (nativeText.trim()) text = nativeText;
+        } catch {
+          // Keep the tesseract.js text already captured above.
+        }
+      }
+
+      return { key, text, confidence: js.confidence };
+    }),
+  );
+
+  const debugDir = await writeTcIdDebugImages({
+    originalJpeg,
+    detectedJpeg,
     cardJpeg,
-  };
+    cardW: meta.width,
+    cardH: meta.height,
+  });
+
+  return { engine, fieldRois, meta, debugDir };
 }
+
 
 /** Second-pass OCR on a specific field region of an already-cropped card. */
 export async function recognizeTcIdFieldCrop(
