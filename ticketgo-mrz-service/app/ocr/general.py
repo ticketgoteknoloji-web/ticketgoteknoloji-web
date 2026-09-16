@@ -46,11 +46,16 @@ def _empty_vehicle_fields() -> dict[str, str | None]:
     return {
         "plate": None,
         "vehicleType": None,
+        "vehicleClass": None,
         "brand": None,
         "model": None,
         "modelYear": None,
         "vin": None,
         "engineNumber": None,
+        "fuelType": None,
+        "color": None,
+        "seatCount": None,
+        "firstRegistrationDate": None,
         "registrationDate": None,
         "ownerName": None,
         "documentNumber": None,
@@ -161,6 +166,20 @@ _VIN_RE = re.compile(r"\b([A-HJ-NPR-Z0-9]{17})\b", re.IGNORECASE)
 _YEAR_RE = re.compile(r"\b((?:19|20)\d{2})\b")
 _DATE_RE = re.compile(r"\b(\d{2}[./-]\d{2}[./-](?:\d{2}|\d{4}))\b")
 _ENGINE_RE = re.compile(r"\b([A-Z0-9]{5,20})\b", re.IGNORECASE)
+_SEAT_LABEL_RE = re.compile(
+    r"(Koltuk Sayısı|Koltuk Sayisi|Oturma Yeri|Seat Count|Seating Capacity)\s*[:：\-]?\s*(\d{1,2})",
+    re.IGNORECASE,
+)
+# Inflected Turkish forms of "motor" itself — never a real engine-number value.
+_ENGINE_LABEL_STOPWORDS = {"MOTOR", "MOTORLU", "MOTORUN", "MOTORIN", "MOTORU", "MOTORLA", "MOTORDUR"}
+
+_FUEL_TYPE_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
+    ("ELECTRIC", ("elektrik", "electric", "ev")),
+    ("HYBRID", ("hibrit", "hybrid")),
+    ("LPG", ("lpg", "otogaz")),
+    ("DIESEL", ("dizel", "diesel", "motorin")),
+    ("GASOLINE", ("benzin", "gasoline", "petrol")),
+]
 
 _VEHICLE_TYPE_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("MOTORCYCLE", ("motosiklet", "motorcycle", "scooter")),
@@ -218,6 +237,15 @@ def _detect_vehicle_type(blob: str) -> str | None:
         for key in keys:
             if key.casefold() in lower:
                 return vtype
+    return None
+
+
+def _detect_fuel_type(blob: str) -> str | None:
+    lower = blob.casefold()
+    for fuel, keys in _FUEL_TYPE_KEYWORDS:
+        for key in keys:
+            if key.casefold() in lower:
+                return fuel
     return None
 
 
@@ -280,6 +308,35 @@ def _labeled_value(lines: list[str], labels: tuple[str, ...]) -> str | None:
     return None
 
 
+def _extract_seat_count(lines: list[str]) -> str | None:
+    """Digit must appear on the SAME line as the label — no next-line fallback for 1-2 digit values."""
+    for line in lines:
+        m = _SEAT_LABEL_RE.search(line)
+        if m:
+            return m.group(2)
+    return None
+
+
+def _extract_labeled_date(lines: list[str], labels: tuple[str, ...], exclude_labels: tuple[str, ...] = ()) -> str | None:
+    """Find a date that sits on a line matching `labels` but NOT `exclude_labels` (handles the
+    "Tescil Tarihi" vs "İlk Tescil Tarihi" substring-overlap case — the latter must not be
+    mistaken for the former)."""
+    label_re = re.compile("(" + "|".join(re.escape(x) for x in labels) + ")", re.IGNORECASE)
+    exclude_re = (
+        re.compile("(" + "|".join(re.escape(x) for x in exclude_labels) + ")", re.IGNORECASE)
+        if exclude_labels
+        else None
+    )
+    for line in lines:
+        if exclude_re and exclude_re.search(line):
+            continue
+        if label_re.search(line):
+            m = _DATE_RE.search(line)
+            if m:
+                return m.group(1)
+    return None
+
+
 def extract_vehicle_fields(lines: list[OcrLine]) -> dict[str, str | None]:
     """Conservative heuristics only. Missing fields stay null — never invent."""
     fields = _empty_vehicle_fields()
@@ -292,7 +349,25 @@ def extract_vehicle_fields(lines: list[OcrLine]) -> dict[str, str | None]:
     fields["vehicleType"] = _detect_vehicle_type(flat)
     fields["brand"] = _extract_brand(flat)
     fields["modelYear"] = _extract_year(flat)
-    fields["registrationDate"] = _extract_date(flat)
+    fields["fuelType"] = _detect_fuel_type(flat)
+
+    # "Tescil Tarihi" is a substring of "İlk Tescil Tarihi" — each must be
+    # matched against its own label, excluding the other, or a document with
+    # both fields would have the first-registration date bleed into the
+    # (re-)registration date field.
+    fields["firstRegistrationDate"] = _extract_labeled_date(
+        texts,
+        ("İlk Tescil Tarihi", "Ilk Tescil Tarihi", "First Registration"),
+    )
+    fields["registrationDate"] = _extract_labeled_date(
+        texts,
+        ("Tescil Tarihi",),
+        exclude_labels=("İlk Tescil Tarihi", "Ilk Tescil Tarihi"),
+    )
+    if fields["registrationDate"] is None:
+        # No explicitly-labeled "Tescil Tarihi" line found — fall back to any
+        # date in the document, same as before this field was disambiguated.
+        fields["registrationDate"] = _extract_date(flat)
 
     fields["model"] = _labeled_value(
         texts,
@@ -310,13 +385,27 @@ def extract_vehicle_fields(lines: list[OcrLine]) -> dict[str, str | None]:
         texts,
         ("Belge No", "Belge Numarası", "Belge Numarasi", "Document No", "Seri No"),
     )
+    fields["vehicleClass"] = _labeled_value(
+        texts,
+        ("Araç Sınıfı", "Arac Sinifi", "Sınıfı", "Sinifi", "Vehicle Class"),
+    )
+    fields["color"] = _labeled_value(
+        texts,
+        ("Rengi", "Renk", "Color", "Colour"),
+    )
+    fields["seatCount"] = _extract_seat_count(texts)
 
-    if fields["engineNumber"] is None and re.search(r"motor", flat, re.IGNORECASE):
+    if fields["engineNumber"] is None and re.search(r"\bmotor\b", flat, re.IGNORECASE):
         for ln in texts:
-            if re.search(r"motor", ln, re.IGNORECASE):
+            if re.search(r"\bmotor\b", ln, re.IGNORECASE):
                 for m in _ENGINE_RE.finditer(ln.upper()):
                     tok = m.group(1).upper()
-                    if len(tok) >= 6 and tok != fields.get("vin") and not _PLATE_RE.search(tok):
+                    if (
+                        len(tok) >= 6
+                        and tok != fields.get("vin")
+                        and not _PLATE_RE.search(tok)
+                        and tok not in _ENGINE_LABEL_STOPWORDS
+                    ):
                         fields["engineNumber"] = tok
                         break
             if fields["engineNumber"]:

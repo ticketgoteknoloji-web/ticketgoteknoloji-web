@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
-import { MrzVerifyScreen } from '@/components/mrz/MrzVerifyScreen';
+import { SmartDocumentReader } from '@/components/mrz/SmartDocumentReader';
 
 export const metadata: Metadata = {
-  title: 'Pasaport / Kimlik Belgesi Okuma',
-  description: 'Belgenizi yükleyin veya kamerayla tarayın.',
+  title: 'Akıllı Belge Okuyucu',
+  description: 'Pasaport, T.C. kimlik veya araç ruhsatınızı yükleyin ya da kamerayla tarayın.',
   robots: { index: false, follow: false },
 };
 
 export default function MrzHomePage() {
-  return <MrzVerifyScreen />;
+  return <SmartDocumentReader />;
 }

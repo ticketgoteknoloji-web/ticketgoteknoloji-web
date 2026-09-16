@@ -82,11 +82,16 @@ class GeneralOcrLine(BaseModel):
 class VehicleRegistrationFields(BaseModel):
     plate: str | None = None
     vehicleType: str | None = None
+    vehicleClass: str | None = None
     brand: str | None = None
     model: str | None = None
     modelYear: str | None = None
     vin: str | None = None
     engineNumber: str | None = None
+    fuelType: str | None = None
+    color: str | None = None
+    seatCount: str | None = None
+    firstRegistrationDate: str | None = None
     registrationDate: str | None = None
     ownerName: str | None = None
     documentNumber: str | None = None
