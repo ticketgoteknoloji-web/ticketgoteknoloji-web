@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { registerHooks } from 'node:module';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -240,6 +241,165 @@ test('Tami JWT header is HS512 compact without padding', () => {
   assert.doesNotMatch(header, /=/);
   assert.doesNotMatch(header, /\+/);
   assert.doesNotMatch(header, /\//);
+});
+
+test('Tami merchant and terminal stay distinct and POS uses the terminal number', () => {
+  const merchantId = '77034202';
+  const terminalId = '84034204';
+  assert.notEqual(merchantId, terminalId);
+  assert.equal(resolveTamiPosId(terminalId, terminalId, merchantId), terminalId);
+  assert.equal(resolveTamiPosId(undefined, terminalId, merchantId), terminalId);
+  assert.equal(resolveTamiPosId(merchantId, terminalId, merchantId), '');
+  assert.equal(hasUsableTamiPosId(terminalId, merchantId), true);
+  assert.equal(hasUsableTamiPosId(merchantId, merchantId), false);
+  const service = readFileSync(join(root, 'src/lib/payments/service.ts'), 'utf8');
+  assert.match(service, /tamiCallbackInflight/);
+  assert.match(service, /if \(order\.status === 'paid'\) return order;/);
+  assert.match(service, /if \(current\?\.status === 'paid'\) return current;/);
+  assert.match(service, /processedTransactionIds\?\.includes\(txn\)/);
+  const store = readFileSync(join(root, 'src/lib/downloads/store.ts'), 'utf8');
+  assert.match(store, /item\.orderId === input\.orderId && item\.productId === input\.productId && item\.status === 'active'/);
+});
+
+test('Tami callback rejects a tampered hash and accepts the canonical hash', () => {
+  const secret = 'callback-test-secret';
+  const payload = {
+    hashParams: 'orderId+success+txnAmount',
+    orderId: 'SIP-1',
+    success: '0',
+    txnAmount: '10.00',
+    hashedData: '',
+  };
+  payload.hashedData = computeCallbackHash(payload, secret);
+  const failed = createHmac('sha256', secret).update('SIP-1false10.00', 'utf8').digest('base64');
+  assert.equal(payload.hashedData, failed);
+  const tampered = { ...payload, success: '1' };
+  const resigned = computeCallbackHash(tampered, secret);
+  assert.notEqual(tampered.hashedData, resigned);
+  tampered.hashedData = resigned;
+  assert.equal(tampered.hashedData, createHmac('sha256', secret).update('SIP-1true10.00', 'utf8').digest('base64'));
+});
+
+test('Tami 3DS form action allows only the active Tami API origin', async () => {
+  const { formActionDirective, inspectTami3dsHtml, QNB_SIPAY_FORM_ORIGINS, TAMI_3DS_ORIGINS } = await import(
+    '../src/lib/payments/tami-3ds-policy.ts'
+  );
+  const production = formActionDirective('production');
+  const sandbox = formActionDirective('sandbox');
+  assert.match(production, /form-action 'self'/);
+  for (const origin of QNB_SIPAY_FORM_ORIGINS) {
+    assert.match(production, new RegExp(origin.replaceAll('.', '\\.')));
+    assert.match(sandbox, new RegExp(origin.replaceAll('.', '\\.')));
+  }
+  assert.match(production, new RegExp(TAMI_3DS_ORIGINS.production.replaceAll('.', '\\.')));
+  assert.equal(production.includes(TAMI_3DS_ORIGINS.sandbox), false);
+  assert.match(sandbox, new RegExp(TAMI_3DS_ORIGINS.sandbox.replaceAll('.', '\\.')));
+  assert.equal(sandbox.includes(TAMI_3DS_ORIGINS.production), false);
+  assert.equal(production.includes('*'), false);
+  assert.doesNotMatch(production, /(^|\s)https:(\s|$)/);
+  assert.equal(production.includes('https://vpostest.qnb.com.tr'), true);
+  const bank = (action) => `<form method="post" action="${action}"><input type="hidden" name="PaReq" value="challenge"></form>`;
+  assert.equal(inspectTami3dsHtml(bank(`${TAMI_3DS_ORIGINS.production}/3d`), 'production').ok, true);
+  assert.equal(inspectTami3dsHtml(bank(`${TAMI_3DS_ORIGINS.sandbox}/3d`), 'sandbox').ok, true);
+  assert.deepEqual(inspectTami3dsHtml(bank(`${TAMI_3DS_ORIGINS.sandbox}/3d`), 'production'), { ok: false, reason: 'unverified_origin' });
+  assert.deepEqual(inspectTami3dsHtml(bank('https://evil.example/phish'), 'production'), { ok: false, reason: 'unverified_origin' });
+  assert.deepEqual(inspectTami3dsHtml(bank('http://paymentapi.tami.com.tr/3d'), 'production'), { ok: false, reason: 'insecure_target' });
+  assert.deepEqual(inspectTami3dsHtml(bank('javascript:alert(1)'), 'production'), { ok: false, reason: 'insecure_target' });
+  assert.deepEqual(inspectTami3dsHtml(bank('//evil.example/phish'), 'production'), { ok: false, reason: 'insecure_target' });
+  assert.deepEqual(inspectTami3dsHtml(bank('https://paymentapi.tami.com.tr.evil.com/3d'), 'production'), { ok: false, reason: 'unverified_origin' });
+  assert.deepEqual(inspectTami3dsHtml('<form method="post"></form>', 'production'), { ok: false, reason: 'missing_form' });
+  assert.deepEqual(
+    inspectTami3dsHtml(`${bank(TAMI_3DS_ORIGINS.production + '/3d')}<button formaction="https://evil.example"></button>`, 'production'),
+    { ok: false, reason: 'unverified_origin' }
+  );
+  assert.deepEqual(
+    inspectTami3dsHtml(
+      `${bank(TAMI_3DS_ORIGINS.production + '/3d')}<meta http-equiv="refresh" content="0;url=https://acs.example/challenge">`,
+      'production'
+    ),
+    { ok: false, reason: 'unverified_origin' }
+  );
+  assert.equal(
+    inspectTami3dsHtml(
+      `${bank(TAMI_3DS_ORIGINS.production + '/3d')}<meta http-equiv="refresh" content="0;url=${TAMI_3DS_ORIGINS.production}/3d">`,
+      'production'
+    ).ok,
+    true
+  );
+  assert.deepEqual(inspectTami3dsHtml(bank('https://&#101;vil.example/3d'), 'production'), { ok: false, reason: 'unverified_origin' });
+  const { tamiApiBase } = await import('../src/lib/payments/tami-3ds-policy.ts');
+  assert.equal(tamiApiBase('production', 'https://evil.example/payment'), TAMI_3DS_ORIGINS.production);
+  assert.equal(tamiApiBase('sandbox', 'https://paymentapi.tami.com.tr'), TAMI_3DS_ORIGINS.sandbox);
+  assert.equal(tamiApiBase('production', `${TAMI_3DS_ORIGINS.production}/api/v0`), `${TAMI_3DS_ORIGINS.production}/api/v0`);
+  assert.equal(tamiApiBase('production', 'http://paymentapi.tami.com.tr'), TAMI_3DS_ORIGINS.production);
+  const middleware = readFileSync(join(root, 'src/middleware.ts'), 'utf8');
+  const launch = readFileSync(join(root, 'src/app/api/payments/tami/launch/route.ts'), 'utf8');
+  assert.match(middleware, /formActionDirective\(tami3dsEnv\(process\.env\.TAMI_ENV\)\)/);
+  assert.match(middleware, /https:\/\/vpostest\.qnb\.com\.tr/);
+  assert.match(middleware, /https:\/\/vpos\.qnb\.com\.tr/);
+  assert.match(middleware, /https:\/\/app\.sipay\.com\.tr/);
+  assert.match(middleware, /https:\/\/panel\.sipay\.com\.tr/);
+  assert.doesNotMatch(middleware, /form-action[^"\n]*\*/);
+  assert.match(launch, /inspectTami3dsHtml\(html, tamiConfig\(\)\.env\)/);
+  assert.match(launch, /tami_launch_rejected_target/);
+  assert.doesNotMatch(launch, /TAMI_SECRET_KEY|TAMI_PASSWORD|PG-Auth-Token/);
+});
+
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier === 'server-only') {
+      return { url: 'data:text/javascript,export default {}', shortCircuit: true };
+    }
+    if (specifier.startsWith('@/')) {
+      const base = join(root, 'src', specifier.slice(2));
+      if (existsSync(base) && statSync(base).isFile()) return { url: pathToFileURL(base).href, shortCircuit: true };
+      if (existsSync(base) && statSync(base).isDirectory()) {
+        for (const index of ['index.ts', 'index.tsx', 'index.js']) {
+          const candidate = join(base, index);
+          if (existsSync(candidate)) return { url: pathToFileURL(candidate).href, shortCircuit: true };
+        }
+      }
+      for (const ext of ['.ts', '.tsx', '.js', '.mjs', '.json']) {
+        if (existsSync(base + ext)) return { url: pathToFileURL(base + ext).href, shortCircuit: true };
+      }
+    }
+    return nextResolve(specifier, context);
+  },
+  load(url, context, nextLoad) {
+    if (url.endsWith('.json')) {
+      return { format: 'json', source: readFileSync(new URL(url), 'utf8'), shortCircuit: true };
+    }
+    return nextLoad(url, context);
+  },
+});
+
+test('payment signing secret signs and verifies Tami and QNB launch tokens', async () => {
+  const previousSecret = process.env.PAYMENT_SIGNING_SECRET;
+  const previousEnv = process.env.PAYMENT_ENV;
+  process.env.PAYMENT_ENV = 'production';
+  process.env.PAYMENT_SIGNING_SECRET = 'fixture-signing-secret-not-a-real-key-0123456789abcdef';
+  try {
+    const { hmacEquals, hmacSign } = await import('../src/lib/payments/security.ts');
+    const { tamiLaunchToken, tamiLaunchTokenOk } = await import('../src/lib/payments/tami-3ds.ts');
+    const { launchToken } = await import('../src/lib/payments/qnb-payfor.ts');
+    const tami = tamiLaunchToken('attempt-1', 'order-1');
+    assert.equal(tamiLaunchTokenOk('attempt-1', 'order-1', tami), true);
+    assert.equal(tamiLaunchTokenOk('attempt-1', 'order-2', tami), false);
+    assert.equal(tamiLaunchTokenOk('attempt-1', 'order-1', `${tami}00`), false);
+    const qnb = launchToken('attempt-1', 'order-1');
+    assert.equal(hmacEquals(qnb, hmacSign('attempt-1:order-1')), true);
+    assert.equal(hmacEquals(qnb, hmacSign('attempt-1:order-2')), false);
+    assert.notEqual(tami, qnb);
+    assert.equal(hmacEquals(hmacSign('admin-key'), hmacSign('admin-key')), true);
+    assert.equal(hmacEquals(hmacSign('admin-key'), hmacSign('other-key')), false);
+    delete process.env.PAYMENT_SIGNING_SECRET;
+    assert.throws(() => hmacSign('x'), /PAYMENT_SIGNING_SECRET is required in production/);
+  } finally {
+    if (previousSecret === undefined) delete process.env.PAYMENT_SIGNING_SECRET;
+    else process.env.PAYMENT_SIGNING_SECRET = previousSecret;
+    if (previousEnv === undefined) delete process.env.PAYMENT_ENV;
+    else process.env.PAYMENT_ENV = previousEnv;
+  }
 });
 
 test('Tami routes and provider exist; iyzico stays removed', () => {

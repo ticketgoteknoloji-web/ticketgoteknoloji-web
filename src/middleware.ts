@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { formActionDirective, tami3dsEnv } from '@/lib/payments/tami-3ds-policy';
 
 function buildCsp(isHttps: boolean): string {
   const directives = [
@@ -13,7 +14,7 @@ function buildCsp(isHttps: boolean): string {
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     // 'self' covers same-origin http(s); keep ws for local tooling without forcing HTTPS upgrades on localhost
     "connect-src 'self' https: wss: ws:",
-    "form-action 'self' https://vpostest.qnb.com.tr https://vpos.qnb.com.tr https://app.sipay.com.tr https://panel.sipay.com.tr",
+    formActionDirective(tami3dsEnv(process.env.TAMI_ENV)),
     "frame-src 'self' https://vpostest.qnb.com.tr https://vpos.qnb.com.tr https://app.sipay.com.tr https://panel.sipay.com.tr",
   ];
   // Never force HTTPS upgrade on local/http previews — it breaks localhost client navigation.

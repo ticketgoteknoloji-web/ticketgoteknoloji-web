@@ -25,6 +25,7 @@ import type { OrderRecord, PaymentCard, PaymentCustomer, PaymentProviderId, Publ
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE = /^\+[1-9]\d{9,14}$/;
+const tamiCallbackInflight = new Map<string, Promise<OrderRecord | null>>();
 
 export function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -359,7 +360,22 @@ export async function finalizeFromCallback(
   providerId: PaymentProviderId,
   payload: Record<string, string>
 ): Promise<OrderRecord | null> {
-  const order =
+  if (providerId !== 'tami') return finalizeCallbackOnce(providerId, payload);
+  const peek = await findCallbackOrder(payload);
+  if (!peek) return null;
+  const inflight = tamiCallbackInflight.get(peek.id);
+  if (inflight) return inflight;
+  const run = finalizeCallbackOnce(providerId, payload);
+  tamiCallbackInflight.set(peek.id, run);
+  try {
+    return await run;
+  } finally {
+    tamiCallbackInflight.delete(peek.id);
+  }
+}
+
+async function findCallbackOrder(payload: Record<string, string>): Promise<OrderRecord | null> {
+  return (
     (await getOrderByProviderToken(payload.token || payload.paymentId || payload.orderId || '')) ||
     (await getOrderById(
       payload.conversationId ||
@@ -369,7 +385,15 @@ export async function finalizeFromCallback(
         payload.orderId ||
         payload.merchantOid ||
         ''
-    ));
+    ))
+  );
+}
+
+async function finalizeCallbackOnce(
+  providerId: PaymentProviderId,
+  payload: Record<string, string>
+): Promise<OrderRecord | null> {
+  const order = await findCallbackOrder(payload);
   if (!order) return null;
   const txn =
     payload.bankReferenceNumber ||
@@ -386,6 +410,11 @@ export async function finalizeFromCallback(
   await updateOrder(order.id, { status: 'processing' });
   const provider = getPaymentProvider(providerId);
   const verified = await provider.verifyPayment({ order, payload });
+  if (providerId === 'tami') {
+    const current = await getOrderById(order.id);
+    if (current?.status === 'paid') return current;
+    if (txn && current?.processedTransactionIds?.includes(txn)) return current;
+  }
   const attempt = await getLatestAttempt(order.id);
   if (!verified.ok) {
     if (attempt) {

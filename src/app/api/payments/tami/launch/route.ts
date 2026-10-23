@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getAttemptById, getOrderById } from '@/lib/payments/orders';
-import { publicBaseUrl } from '@/lib/payments/config';
+import { publicBaseUrl, tamiConfig } from '@/lib/payments/config';
 import { takeTami3dsHtml, tamiLaunchTokenOk } from '@/lib/payments/tami-3ds';
+import { inspectTami3dsHtml } from '@/lib/payments/tami-3ds-policy';
 import { clientIp, paymentLog, rateLimit } from '@/lib/payments/security';
 
 export const runtime = 'nodejs';
@@ -27,6 +28,11 @@ export async function GET(request: Request) {
   const html = takeTami3dsHtml(attempt.id, order.id);
   if (!html) {
     paymentLog('tami_launch_missing_html', { orderNumber: order.orderNumber });
+    return NextResponse.redirect(`${publicBaseUrl(request)}/payment/failure?order=${encodeURIComponent(order.id)}`);
+  }
+  const target = inspectTami3dsHtml(html, tamiConfig().env);
+  if (!target.ok) {
+    paymentLog('tami_launch_rejected_target', { orderNumber: order.orderNumber, reason: target.reason });
     return NextResponse.redirect(`${publicBaseUrl(request)}/payment/failure?order=${encodeURIComponent(order.id)}`);
   }
   return new NextResponse(html, {

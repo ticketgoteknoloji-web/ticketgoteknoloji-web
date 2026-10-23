@@ -1,3 +1,4 @@
+import { tamiApiBase } from '@/lib/payments/tami-3ds-policy';
 import { BRAND_SITE_URL } from '@/lib/site';
 
 export type PaymentEnvironment = 'test' | 'production';
@@ -170,7 +171,7 @@ export function getPaymentConfig() {
     tami: {
       enabled: tamiEnabled,
       env: tamiEnv,
-      baseUrl: tamiEnv === 'production' ? tamiProductionBase.replace(/\/$/, '') : tamiSandboxBase.replace(/\/$/, ''),
+      baseUrl: tamiApiBase(tamiEnv, tamiEnv === 'production' ? tamiProductionBase : tamiSandboxBase),
       merchantId: tamiMerchantId,
       posId: tamiPosId,
       username: tamiUsername,
