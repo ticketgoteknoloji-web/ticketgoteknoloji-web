@@ -1,15 +1,18 @@
 'use client';
 
-import { FormEvent, useMemo, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BrandLogo } from '@/components/BrandLogo';
 import { getProductImage } from '@/lib/payments/product-images';
 import { LegalTrigger } from '@/components/legal/LegalTrigger';
+import { useUsdTryQuote } from '@/components/price/FxProvider';
 import type { QnbCardProgram } from '@/config/qnbpay-card-programs';
 import type { ProductQuote } from '@/lib/commerce';
+import { convertUsdToTry } from '@/lib/fx/convert';
+import { formatTcmbDate, formatTryAmount, formatTryRate, formatUsdAmount } from '@/lib/fx/format';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
-import { formatMinor } from '@/lib/money';
+import { formatMinor, fromMinorUnits } from '@/lib/money';
 import {
   cardNumberValid,
   cvvValid,
@@ -20,6 +23,9 @@ import {
   formatExpiry,
   maskCardNumber,
   networkLabel,
+  shouldAdvanceCardField,
+  UI_CARD_NUMBER_DIGITS,
+  UI_CARD_NUMBER_INPUT_MAX,
 } from '@/lib/payments/card-ui';
 import { createMailto, createWhatsAppLink } from '@/lib/mailto';
 import { BRAND_SUPPORT_EMAIL, BRAND_WHATSAPP_NUMBER } from '@/lib/site';
@@ -33,7 +39,7 @@ type PaymentCheckoutProps = {
   installments: number[];
 };
 
-export function PaymentCheckout({ quote, configured, testMode, providerStatus, cardPrograms, installments }: PaymentCheckoutProps) {
+export function PaymentCheckout({ quote, configured, testMode, providerStatus, cardPrograms }: PaymentCheckoutProps) {
   const idempotencyKey = useRef(
     typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
   );
@@ -54,14 +60,30 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
   const [company, setCompany] = useState('');
   const [taxOffice, setTaxOffice] = useState('');
   const [installment, setInstallment] = useState(1);
+  const [tamiInstallments, setTamiInstallments] = useState<Array<{ count: number; enabled: boolean }>>([
+    { count: 1, enabled: true },
+  ]);
+  const [installmentFallback, setInstallmentFallback] = useState(false);
+  const [installmentNotice, setInstallmentNotice] = useState<string | null>(null);
   const [cardHolder, setCardHolder] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
+  const [debugPayment, setDebugPayment] = useState(false);
+  const expiryRef = useRef<HTMLInputElement>(null);
+  const cvvRef = useRef<HTMLInputElement>(null);
+
+  function focusNextCardField(target: HTMLInputElement | null) {
+    queueMicrotask(() => target?.focus());
+  }
 
   const totalLabel = formatMinor(quote.totalMinor, quote.currency);
   const subtotalLabel = formatMinor(quote.subtotalMinor, quote.currency);
   const vatLabel = formatMinor(quote.vatMinor, quote.currency);
+  const { quote: fx, loading: fxLoading } = useUsdTryQuote();
+  const usdTotal = fromMinorUnits(quote.totalMinor);
+  const tryTotal = fx.rate != null ? convertUsdToTry(usdTotal, fx.rate) : null;
+  const tryTotalLabel = tryTotal != null ? formatTryAmount(tryTotal) : null;
   const enabledPrograms = cardPrograms.filter((item) => item.enabled);
   const network = detectCardNetwork(cardNumber);
   const customerValid =
@@ -71,7 +93,9 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
     Boolean(phone.trim()) &&
     Boolean(address.trim()) &&
     Boolean(city.trim()) &&
-    Boolean(identityNumber.trim()) &&
+    (billingType === 'company'
+      ? /^\d{10}$/.test(digitsOnly(identityNumber))
+      : /^\d{11}$/.test(digitsOnly(identityNumber))) &&
     (billingType === 'individual' || (Boolean(company.trim()) && Boolean(taxOffice.trim())));
   const holderOk = Boolean(cardHolder.trim());
   const panOk = cardNumberValid(cardNumber);
@@ -79,7 +103,125 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
   const cvvOk = cvvValid(cvv, network);
   const cardOk = holderOk && panOk && expiryOk && cvvOk;
   const orderOk = Boolean(quote.productId) && quote.totalMinor > 0;
-  const canPay = Boolean(customerValid && cardOk && legalAccepted && orderOk && !submitting);
+  const canPay = Boolean(
+    configured && customerValid && cardOk && legalAccepted && orderOk && !submitting && tryTotal != null
+  );
+  const fxRateAvailable = fx.rate != null;
+  const tryTotalAvailable = tryTotal != null;
+  const blockedBy = [
+    !customerValid ? 'customerValid' : null,
+    !holderOk ? 'holderOk' : null,
+    !panOk ? 'panOk' : null,
+    !expiryOk ? 'expiryOk' : null,
+    !cvvOk ? 'cvvOk' : null,
+    !cardOk ? 'cardOk' : null,
+    !legalAccepted ? 'legalAccepted' : null,
+    !orderOk ? 'orderOk' : null,
+    !configured ? 'configured' : null,
+    submitting ? 'submitting' : null,
+    configured && !tryTotalAvailable ? 'tryTotal' : null,
+    configured && !fxRateAvailable ? 'fx.rate' : null,
+  ].filter((item): item is string => Boolean(item));
+  const offeredInstallments = tamiInstallments.filter((item) => item.enabled && item.count >= 1);
+  const installmentChoices = offeredInstallments.length ? offeredInstallments : [{ count: 1, enabled: true }];
+  const tamiPointPanel = {
+    available: false,
+    amountLabel: null as string | null,
+    redeemable: false,
+  };
+
+  useEffect(() => {
+    const bin = digitsOnly(cardNumber).slice(0, 6);
+    if (bin.length < 6) {
+      setTamiInstallments([{ count: 1, enabled: true }]);
+      setInstallment(1);
+      setInstallmentFallback(false);
+      setInstallmentNotice(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/payments/tami/installments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ bin }),
+        });
+        const data = (await response.json()) as {
+          success?: boolean;
+          installments?: Array<{ count: number; enabled: boolean }>;
+          fallback?: boolean;
+          message?: string | null;
+        };
+        if (cancelled) return;
+        const next = (data.installments ?? [])
+          .filter((item) => item && item.enabled !== false && Number(item.count) >= 1)
+          .map((item) => ({ count: Number(item.count), enabled: true }));
+        const unique = Array.from(new Map(next.map((item) => [item.count, item])).values()).sort(
+          (a, b) => a.count - b.count
+        );
+        const options = unique.length ? unique : [{ count: 1, enabled: true }];
+        setTamiInstallments(options);
+        setInstallmentFallback(data.fallback === true || data.success === false);
+        setInstallmentNotice(data.fallback || data.success === false ? data.message || 'Taksit seçenekleri şu anda alınamadı. Ödeme tek çekim olarak devam eder.' : null);
+        setInstallment((current) => (options.some((item) => item.count === current) ? current : 1));
+      } catch {
+        if (cancelled) return;
+        setTamiInstallments([{ count: 1, enabled: true }]);
+        setInstallment(1);
+        setInstallmentFallback(true);
+        setInstallmentNotice('Taksit seçenekleri şu anda alınamadı. Ödeme tek çekim olarak devam eder.');
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [cardNumber]);
+
+  useEffect(() => {
+    try {
+      setDebugPayment(new URLSearchParams(window.location.search).get('debugPayment') === '1');
+    } catch {
+      setDebugPayment(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!debugPayment) return;
+    console.debug('[Payment Debug]', {
+      customerValid,
+      holderOk,
+      panOk,
+      expiryOk,
+      cvvOk,
+      cardOk,
+      legalAccepted,
+      orderOk,
+      configured,
+      fxRateAvailable,
+      tryTotalAvailable,
+      submitting,
+      canPay,
+    });
+  }, [
+    debugPayment,
+    customerValid,
+    holderOk,
+    panOk,
+    expiryOk,
+    cvvOk,
+    cardOk,
+    legalAccepted,
+    orderOk,
+    configured,
+    fxRateAvailable,
+    tryTotalAvailable,
+    submitting,
+    canPay,
+  ]);
 
   const errors = {
     holder: !holderOk ? 'Kart üzerindeki ad soyad alanını doldurun.' : null,
@@ -88,21 +230,20 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
     cvv: !cvvOk ? 'Güvenlik kodunu kontrol edin.' : null,
   };
 
-  const legalQuery = useMemo(() => {
-    const params = new URLSearchParams({ productId: quote.productId, period: quote.period });
-    if (quote.quantity !== 1) params.set('qty', String(quote.quantity));
-    return params.toString();
-  }, [quote.period, quote.productId, quote.quantity]);
-
   function clearSensitiveCard() {
     setCvv('');
     setCardNumber('');
     setExpiry('');
   }
 
-  async function startQnbPayment(event?: FormEvent<HTMLFormElement>) {
+  async function startTamiPayment(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     if (submitting) return;
+    if (!configured) {
+      setMessageTone('info');
+      setMessage('Tami / Garanti BBVA ödeme altyapısı henüz tamamlanmadı. POS/Terminal aktivasyonu bekleniyor.');
+      return;
+    }
     setAttempted(true);
     if (!customerValid || !cardOk || !legalAccepted || !orderOk) {
       setMessageTone('error');
@@ -112,7 +253,8 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
     setMessage(null);
     setSubmitting(true);
     try {
-      const response = await fetch('/api/payments/qnbpay/create', {
+      const expiryDigits = digitsOnly(expiry);
+      const response = await fetch('/api/payments/tami/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -138,6 +280,13 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             country: 'Turkey',
             billingType,
           },
+          card: {
+            holderName: cardHolder.trim(),
+            number: digitsOnly(cardNumber),
+            expireMonth: expiryDigits.slice(0, 2),
+            expireYear: expiryDigits.slice(2, 4),
+            cvv: digitsOnly(cvv),
+          },
         }),
       });
       const data = (await response.json()) as {
@@ -150,14 +299,14 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       };
       if (data.configured === false) {
         if (data.missingEnv?.length) {
-          console.info(`[TicketGo payment] QNBpay credentials missing. Set: ${data.missingEnv.join(', ')}`);
+          console.info(`[TicketGo payment] Tami credentials missing. Set: ${data.missingEnv.join(', ')}`);
         } else {
-          console.info('[TicketGo payment] QNBpay credentials missing. Check server-side environment variables.');
+          console.info('[TicketGo payment] Tami credentials missing. Check server-side environment variables.');
         }
       }
       if (data.callbackLocal) {
         console.info(
-          '[TicketGo payment] Callback URL is localhost. Remote QNB tests require PAYMENT_PUBLIC_BASE_URL on a public HTTPS origin.'
+          '[TicketGo payment] Callback URL is localhost. Remote Tami 3D Secure tests require PAYMENT_PUBLIC_BASE_URL or TAMI_CALLBACK_URL on a public HTTPS origin.'
         );
       }
       if (data.redirectUrl) {
@@ -168,8 +317,8 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       setMessageTone(data.configured === false ? 'info' : 'error');
       setMessage(
         data.configured === false
-          ? 'QNBpay Sanal POS bağlantısı henüz yapılandırılmadı. Test için üye işyeri bilgilerini .env.local dosyasına ekleyin.'
-          : data.message || data.error || 'QNBpay ile ödeme başlatılamadı.'
+          ? 'Tami / Garanti BBVA ödeme altyapısı henüz tamamlanmadı. POS/Terminal aktivasyonu bekleniyor.'
+          : data.message || data.error || 'Tami ile ödeme başlatılamadı.'
       );
       setSubmitting(false);
     } catch {
@@ -181,26 +330,14 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
 
   return (
     <div className="section-wrap min-w-0 overflow-x-hidden py-8 sm:py-10">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-6">
         <BrandLogo variant="header" />
-        <div className="flex flex-wrap items-center gap-2">
-          {testMode ? (
-            <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-warning">
-              Test modu
-            </span>
-          ) : null}
-          {providerStatus && (testMode || process.env.NODE_ENV !== 'production') ? (
-            <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-muted">
-              {providerStatus}
-            </span>
-          ) : null}
-        </div>
       </div>
 
       <div className="max-w-3xl">
         <h1 className="font-sans text-2xl font-bold tracking-[-0.03em] text-ink sm:text-3xl">Güvenli Ödeme</h1>
         <p className="mt-2 text-sm leading-6 text-muted">
-          Siparişinizi tamamlamak için kart ve fatura bilgilerinizi girin. Ödeme QNBpay güvenli altyapısı üzerinden
+          Siparişinizi tamamlamak için kart ve fatura bilgilerinizi girin. Ödeme Tami / Garanti BBVA Sanal POS güvenli altyapısı üzerinden
           yürütülür.
         </p>
         <Link href="/" className="mt-3 inline-block text-sm font-medium text-brand-600 hover:underline">
@@ -209,7 +346,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
       </div>
 
       <form
-        onSubmit={startQnbPayment}
+        onSubmit={startTamiPayment}
         className="mt-8 grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]"
         autoComplete="on"
         noValidate
@@ -264,8 +401,33 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                 <dd>{totalLabel}</dd>
               </div>
             </dl>
+            <div className="mt-4 rounded-xl border border-line bg-canvas px-3 py-3 text-xs leading-5 text-muted">
+              <p className="flex justify-between gap-3">
+                <span>Ürün fiyatı (KDV dahil)</span>
+                <span className="font-medium text-ink">{formatUsdAmount(usdTotal)}</span>
+              </p>
+              <p className="mt-2 flex justify-between gap-3">
+                <span>TCMB USD satış kuru</span>
+                <span className="font-medium text-ink">
+                  {fx.rate != null ? `1 USD = ${formatTryRate(fx.rate)}` : fxLoading ? 'Yükleniyor' : 'Alınamadı'}
+                </span>
+              </p>
+              <p className="mt-2 flex justify-between gap-3">
+                <span>Kur tarihi</span>
+                <span className="font-medium text-ink">{formatTcmbDate(fx.date) || '—'}</span>
+              </p>
+              <p className="mt-2 flex justify-between gap-3 text-sm">
+                <span className="font-medium text-ink">Kartınızdan çekilecek tutar</span>
+                <span className="font-semibold text-ink">
+                  {tryTotalLabel ?? (fxLoading ? 'Hesaplanıyor...' : 'TL karşılığı şu anda hesaplanamıyor')}
+                </span>
+              </p>
+              <p className="mt-2 text-[11px] leading-5">
+                Kur kaynağı: Türkiye Cumhuriyet Merkez Bankası. USD olarak belirlenen ürün fiyatının TL karşılığı, ödeme işlemi başlatıldığı anda geçerli TCMB USD satış kuru kullanılarak hesaplanır.
+              </p>
+            </div>
             <p className="mt-4 text-xs leading-5 text-muted">
-              Tahsil edilecek tutar KDV dahil toplam bedeldir. Fiyatlar katalogdan sunucu tarafında hesaplanır.
+              Tahsil edilecek tutar KDV dahil toplam bedelin TCMB kuru ile TL karşılığıdır. Fiyatlar katalogdan sunucu tarafında hesaplanır.
             </p>
             </div>
           </section>
@@ -321,12 +483,23 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                   autoComplete="cc-number"
                   autoCorrect="off"
                   spellCheck={false}
-                  maxLength={23}
+                  maxLength={UI_CARD_NUMBER_INPUT_MAX}
+                  enterKeyHint="next"
                   value={cardNumber}
-                  onChange={(event) => setCardNumber(formatCardNumber(event.target.value))}
+                  onChange={(event) => {
+                    const next = formatCardNumber(event.target.value);
+                    setCardNumber(next);
+                    if (shouldAdvanceCardField(cardNumber, next, UI_CARD_NUMBER_DIGITS)) {
+                      focusNextCardField(expiryRef.current);
+                    }
+                  }}
                   onPaste={(event) => {
                     event.preventDefault();
-                    setCardNumber(formatCardNumber(event.clipboardData.getData('text')));
+                    const next = formatCardNumber(event.clipboardData.getData('text'));
+                    setCardNumber(next);
+                    if (shouldAdvanceCardField(cardNumber, next, UI_CARD_NUMBER_DIGITS)) {
+                      focusNextCardField(expiryRef.current);
+                    }
                   }}
                   aria-invalid={attempted && !panOk}
                   aria-describedby={attempted && !panOk ? 'card-number-error' : 'card-network'}
@@ -349,12 +522,28 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                 <span className="font-medium text-ink">Son Kullanma Tarihi</span>
                 <input
                   id="card-expiry"
+                  ref={expiryRef}
                   inputMode="numeric"
                   autoComplete="cc-exp"
                   spellCheck={false}
                   maxLength={7}
+                  enterKeyHint="next"
                   value={expiry}
-                  onChange={(event) => setExpiry(formatExpiry(event.target.value))}
+                  onChange={(event) => {
+                    const next = formatExpiry(event.target.value);
+                    setExpiry(next);
+                    if (shouldAdvanceCardField(expiry, next, 4)) {
+                      focusNextCardField(cvvRef.current);
+                    }
+                  }}
+                  onPaste={(event) => {
+                    event.preventDefault();
+                    const next = formatExpiry(event.clipboardData.getData('text'));
+                    setExpiry(next);
+                    if (shouldAdvanceCardField(expiry, next, 4)) {
+                      focusNextCardField(cvvRef.current);
+                    }
+                  }}
                   aria-invalid={attempted && !expiryOk}
                   aria-describedby={attempted && !expiryOk ? 'card-expiry-error' : undefined}
                   className="field-input mt-1 font-mono"
@@ -370,12 +559,13 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                 <span className="font-medium text-ink">Güvenlik Kodu</span>
                 <input
                   id="card-cvv"
+                  ref={cvvRef}
                   type="password"
                   inputMode="numeric"
                   autoComplete="off"
-                  maxLength={4}
+                  maxLength={3}
                   value={cvv}
-                  onChange={(event) => setCvv(digitsOnly(event.target.value).slice(0, 4))}
+                  onChange={(event) => setCvv(digitsOnly(event.target.value).slice(0, 3))}
                   aria-invalid={attempted && !cvvOk}
                   aria-describedby={attempted && !cvvOk ? 'card-cvv-help card-cvv-error' : 'card-cvv-help'}
                   className="field-input mt-1 tracking-[0.35em]"
@@ -412,7 +602,14 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             </label>
             <label className="text-sm sm:col-span-2">
               <span className="font-medium text-ink">Fatura tipi</span>
-              <select className="field-input mt-1" value={billingType} onChange={(event) => setBillingType(event.target.value as 'individual' | 'company')}>
+              <select
+                className="field-input mt-1"
+                value={billingType}
+                onChange={(event) => {
+                  setBillingType(event.target.value as 'individual' | 'company');
+                  setIdentityNumber('');
+                }}
+              >
                 <option value="individual">Bireysel</option>
                 <option value="company">Kurumsal</option>
               </select>
@@ -420,7 +617,7 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             {billingType === 'company' ? (
               <>
                 <label className="text-sm sm:col-span-2">
-                  <span className="font-medium text-ink">Firma Ünvan?</span>
+                  <span className="font-medium text-ink">Firma Ünvanı</span>
                   <input name="company" autoComplete="organization" value={company} onChange={(e) => setCompany(e.target.value)} className="field-input mt-1" />
                 </label>
                 <label className="text-sm">
@@ -428,14 +625,34 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
                   <input name="taxOffice" value={taxOffice} onChange={(e) => setTaxOffice(e.target.value)} className="field-input mt-1" />
                 </label>
                 <label className="text-sm">
-                  <span className="font-medium text-ink">Vergi numaras?</span>
-                  <input required inputMode="numeric" value={identityNumber} onChange={(e) => setIdentityNumber(e.target.value)} className="field-input mt-1" />
+                  <span className="font-medium text-ink">Vergi numarası</span>
+                  <input
+                    required
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={10}
+                    pattern="\d{10}"
+                    value={identityNumber}
+                    onChange={(event) => setIdentityNumber(digitsOnly(event.target.value).slice(0, 10))}
+                    className="field-input mt-1 font-mono"
+                    placeholder="10 haneli vergi no"
+                  />
                 </label>
               </>
             ) : (
               <label className="text-sm sm:col-span-2">
-                <span className="font-medium text-ink">T.C. kimlik numaras?</span>
-                <input required inputMode="numeric" value={identityNumber} onChange={(e) => setIdentityNumber(e.target.value)} className="field-input mt-1" />
+                <span className="font-medium text-ink">T.C. kimlik numarası</span>
+                <input
+                  required
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={11}
+                  pattern="\d{11}"
+                  value={identityNumber}
+                  onChange={(event) => setIdentityNumber(digitsOnly(event.target.value).slice(0, 11))}
+                  className="field-input mt-1 font-mono"
+                  placeholder="11 haneli T.C. kimlik no"
+                />
               </label>
             )}
             <label className="text-sm sm:col-span-2">
@@ -448,17 +665,34 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
             </label>
           </div>
 
-          {installments.length > 1 ? (
+          {installmentChoices.length > 1 ? (
             <label className="mt-4 block text-sm">
               <span className="font-medium text-ink">Taksit seçenekleri</span>
               <select className="field-input mt-1" value={installment} onChange={(event) => setInstallment(Number(event.target.value))}>
-                {installments.map((count) => (
-                  <option key={count} value={count}>
-                    {count <= 1 ? 'Tek çekim' : `${count} Taksit`}
+                {installmentChoices.map((item) => (
+                  <option key={item.count} value={item.count}>
+                    {item.count <= 1 ? 'Tek çekim' : `${item.count} Taksit`}
                   </option>
                 ))}
               </select>
             </label>
+          ) : (
+            <p className="mt-4 text-sm text-muted">Tek çekim</p>
+          )}
+          {installmentFallback && installmentNotice ? (
+            <p className="mt-2 text-xs leading-5 text-muted">{installmentNotice}</p>
+          ) : null}
+
+          {tamiPointPanel.available && tamiPointPanel.amountLabel ? (
+            <div className="mt-4 rounded-xl border border-line bg-canvas px-3 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Kullanılabilir Puan</p>
+              <p className="mt-1 text-sm font-semibold text-ink">{tamiPointPanel.amountLabel}</p>
+              {tamiPointPanel.redeemable ? (
+                <button type="button" className="btn btn-secondary mt-3 w-full">
+                  Puan Kullan
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
           {enabledPrograms.length ? (
@@ -508,16 +742,56 @@ export function PaymentCheckout({ quote, configured, testMode, providerStatus, c
           {message ? <p className={`mt-4 text-sm ${messageTone === 'error' ? 'text-danger' : 'text-brand-700'}`}>{message}</p> : null}
 
           <div className="payment-pay-bar mt-6">
-            <span className="text-sm font-medium text-ink">Ödenecek Toplam (KDV Dahil)</span>
-            <strong>{totalLabel}</strong>
+            <span className="text-sm font-medium text-ink">Karttan çekilecek (KDV Dahil)</span>
+            <strong>{tryTotalLabel ?? totalLabel}</strong>
           </div>
           {!configured ? (
-            <p className="mt-2 text-xs text-warning">QNBpay Sanal POS bağlantısı henüz yapılandırılmadı.</p>
+            <p className="mt-2 text-xs text-warning">
+              Tami / Garanti BBVA ödeme altyapısı henüz tamamlanmadı. POS/Terminal aktivasyonu bekleniyor.
+            </p>
+          ) : tryTotal == null && !fxLoading ? (
+            <p className="mt-2 text-xs text-warning">TCMB kuru alınamadı. TL tahsilatı şu anda başlatılamaz.</p>
+          ) : null}
+          {debugPayment ? (
+            <div className="mt-3 rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-[11px] leading-5 text-muted">
+              <p className="font-sans text-[10px] font-semibold uppercase tracking-wide text-ink">Payment debug</p>
+              <ul className="mt-1 space-y-0.5">
+                <li>customerValid: {customerValid ? 'TRUE' : 'FALSE'}</li>
+                <li>holderOk: {holderOk ? 'TRUE' : 'FALSE'}</li>
+                <li>panOk: {panOk ? 'TRUE' : 'FALSE'}</li>
+                <li>expiryOk: {expiryOk ? 'TRUE' : 'FALSE'}</li>
+                <li>cvvOk: {cvvOk ? 'TRUE' : 'FALSE'}</li>
+                <li>cardOk: {cardOk ? 'TRUE' : 'FALSE'}</li>
+                <li>legalAccepted: {legalAccepted ? 'TRUE' : 'FALSE'}</li>
+                <li>orderOk: {orderOk ? 'TRUE' : 'FALSE'}</li>
+                <li>configured: {configured ? 'TRUE' : 'FALSE'}</li>
+                <li>fxLoading: {fxLoading ? 'TRUE' : 'FALSE'}</li>
+                <li>fx.rate: {fxRateAvailable ? 'TRUE' : 'FALSE'}</li>
+                <li>tryTotal: {tryTotalAvailable ? 'TRUE' : 'FALSE'}</li>
+                <li>submitting: {submitting ? 'TRUE' : 'FALSE'}</li>
+                <li>canPay: {canPay ? 'TRUE' : 'FALSE'}</li>
+                <li>quote.productId: {quote.productId || '—'}</li>
+                <li>quote.period: {quote.period}</li>
+                <li>quote.totalMinor &gt; 0: {quote.totalMinor > 0 ? 'TRUE' : 'FALSE'}</li>
+                <li>providerStatus: {providerStatus || '—'}</li>
+                <li>testMode: {testMode ? 'TRUE' : 'FALSE'}</li>
+              </ul>
+              {!canPay ? (
+                <div className="mt-2 font-sans text-[11px] text-ink">
+                  <p>BLOCKED BY:</p>
+                  <ul className="mt-0.5">
+                    {(blockedBy.length ? blockedBy : ['(unknown)']).map((item) => (
+                      <li key={item}>- {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           ) : null}
           <button type="submit" disabled={!canPay} aria-disabled={!canPay} className="btn btn-primary mt-4 w-full">
             {submitting ? 'Ödeme işlemi başlatılıyor...' : 'Güvenli Ödeme Yap'}
           </button>
-          <p className="mt-2 text-center text-xs text-muted">QNBpay · 3D Secure</p>
+          <p className="mt-2 text-center text-xs text-muted">Tami / Garanti BBVA · 3D Secure</p>
           <p className="mt-3 text-xs leading-5 text-muted">
             Ödeme konusunda destek alın:{' '}
             <a

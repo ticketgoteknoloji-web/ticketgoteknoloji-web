@@ -112,34 +112,61 @@ test('quote-only items are not in the purchasable set', () => {
 test('valid TCKN checksum', () => {
   assert.equal(isValidTckn('10000000146'), true);
   assert.equal(isValidTckn('12345678901'), false);
+  assert.equal(isValidTckn('1000000014'), false);
+  assert.equal(isValidTckn('100000001466'), false);
 });
 
-test('card fields are ephemeral UI and stripped from payment payloads', () => {
+test('billing identity fields lock VKN to 10 digits and TCKN to 11 digits', () => {
+  function digitsOnly(value) {
+    return value.replace(/\D/g, '');
+  }
+  assert.equal(digitsOnly('1234567890123').slice(0, 10), '1234567890');
+  assert.equal(digitsOnly('1234567890123').slice(0, 11), '12345678901');
+  assert.equal(digitsOnly('1234567890').length, 10);
+  assert.equal(digitsOnly('10000000146').length, 11);
+  assert.match(checkout, /Vergi numarası/);
+  assert.match(checkout, /T\.C\. kimlik numarası/);
+  assert.match(checkout, /maxLength=\{10\}/);
+  assert.match(checkout, /maxLength=\{11\}/);
+  assert.match(checkout, /slice\(0, 10\)/);
+  assert.match(checkout, /slice\(0, 11\)/);
+  assert.match(checkout, /\\d\{10\}/);
+  assert.match(checkout, /\\d\{11\}/);
+  assert.match(service, /Vergi numarası 10 haneli olmalıdır/);
+  assert.match(service, /isValidTckn/);
+  assert.match(service, /\^\\d\{10\}\$/);
+});
+
+test('card fields are ephemeral UI and never persisted client-side', () => {
   const cleaned = stripCardFields({ invoice_id: 'SIP-1', cc_no: '4111111111111111', cvv: '123' });
   assert.deepEqual(cleaned, { invoice_id: 'SIP-1' });
   assert.match(http, /stripCardFields/);
   assert.doesNotMatch(checkout, /name=["'](cardNumber|cvv|cvc|expiry|cc_no)/i);
   assert.doesNotMatch(checkout, /localStorage|sessionStorage/);
-  const payloadStart = checkout.indexOf('body: JSON.stringify({');
-  assert.ok(payloadStart >= 0);
-  const payloadChunk = checkout.slice(payloadStart, payloadStart + 900);
-  assert.doesNotMatch(payloadChunk, /cardNumber:|cvv:|cc_no:|expiry:/);
+  assert.match(checkout, /\/api\/payments\/tami\/create/);
+  assert.match(checkout, /card: \{/);
+  assert.match(checkout, /cvv: digitsOnly\(cvv\)/);
   assert.match(checkout, /type="password"/);
   assert.match(checkout, /Kart Üzerindeki Ad Soyad/);
   assert.match(checkout, /Güvenlik Kodu/);
   assert.match(checkout, /maskCardNumber/);
+  assert.match(http, /provider === 'tami' \? readCard/);
+  assert.doesNotMatch(service, /cvv:/);
+  assert.doesNotMatch(readFileSync(join(root, 'src/lib/payments/orders.ts'), 'utf8'), /\bcvv\b/);
 });
 
 test('provider secrets stay server-side', () => {
   assert.equal(existsSync(join(root, 'src/lib/payments/iyzico.ts')), false);
   assert.equal(existsSync(join(root, 'src/app/api/payments/iyzico')), false);
   assert.match(qnbpay, /QNBPAY_APP_SECRET|qnbpayConfig/);
-  assert.doesNotMatch(checkout, /IYZICO_SECRET_KEY|QNBPAY_APP_SECRET|IYZICO_API_KEY|QNBPAY_STORE_KEY|QNBPAY_PASSWORD/);
+  assert.doesNotMatch(checkout, /IYZICO_SECRET_KEY|QNBPAY_APP_SECRET|IYZICO_API_KEY|QNBPAY_STORE_KEY|QNBPAY_PASSWORD|TAMI_SECRET_KEY|TAMI_PASSWORD/);
   assert.doesNotMatch(envExample, /IYZICO_/);
-  assert.match(envExample, /QNBPAY_APP_ID=/);
+  assert.match(envExample, /TAMI_MERCHANT_ID=/);
+  assert.match(envExample, /TAMI_SECRET_KEY=/);
+  assert.match(envExample, /TAMI_ENV=sandbox/);
+  assert.match(envExample, /QNBPAY_ENABLED=false/);
   assert.match(envExample, /NEXT_PUBLIC_SITE_URL=/);
-  assert.match(envExample, /QNBPAY_ENABLED=/);
-  assert.doesNotMatch(envExample, /NEXT_PUBLIC_IYZICO_|NEXT_PUBLIC_QNBPAY_/);
+  assert.doesNotMatch(envExample, /NEXT_PUBLIC_IYZICO_|NEXT_PUBLIC_QNBPAY_|NEXT_PUBLIC_TAMI_/);
 });
 
 test('checkout requires versioned contract acceptance', () => {
@@ -159,7 +186,10 @@ test('orders persist payment attempts and paidAt', () => {
 
 test('provider amount mismatch is not treated as paid', () => {
   assert.match(qnbpay, /providerAmountMatches/);
-  assert.match(qnbpay, /sipayDecryptHash/);
+  const tami = readFileSync(join(root, 'src/lib/payments/tami.ts'), 'utf8');
+  assert.match(tami, /providerAmountMatches/);
+  assert.match(tami, /tami_amount_mismatch/);
+  assert.match(tami, /\/payment\/complete-3ds/);
   const payfor = readFileSync(join(root, 'src/lib/payments/qnb-payfor.ts'), 'utf8');
   assert.match(payfor, /qnb_payfor_amount_mismatch/);
   assert.match(payfor, /qnb_payfor_hash_invalid/);
@@ -199,28 +229,39 @@ test('card number formatting and luhn stay client-side', () => {
   assert.match(cardUi, /export function luhnOk/);
   assert.match(cardUi, /export function formatExpiry/);
   assert.match(cardUi, /export function maskCardNumber/);
-  assert.match(cardUi, /UI_CARD_NUMBER_DIGITS = 19/);
-  assert.match(cardUi, /UI_CARD_NUMBER_MIN = 13/);
+  assert.match(cardUi, /UI_CARD_NUMBER_DIGITS = 16/);
+  assert.match(cardUi, /UI_CARD_NUMBER_MIN = 16/);
+  assert.match(cardUi, /UI_CARD_NUMBER_INPUT_MAX = 19/);
   assert.match(cardUi, /slice\(0, UI_CARD_NUMBER_DIGITS\)/);
   assert.doesNotMatch(cardUi, /length === 20/);
   assert.doesNotMatch(cardUi, /UI_CARD_NUMBER_DIGITS = 20/);
+  assert.doesNotMatch(cardUi, /UI_CARD_NUMBER_DIGITS = 19/);
   assert.doesNotMatch(cardUi, /localStorage|sessionStorage|fetch\(/);
   assert.match(checkout, /Kart numarasını kontrol edin/);
   assert.match(checkout, /xxxx xxxx xxxx xxxx/);
   assert.doesNotMatch(checkout, /1234 5678 9012 3456 7890/);
   assert.doesNotMatch(checkout, /20 rakam/);
-  assert.match(checkout, /maxLength=\{23\}/);
-  assert.match(checkout, /const canPay = Boolean\(customerValid && cardOk && legalAccepted && orderOk && !submitting\)/);
+  assert.match(checkout, /maxLength=\{UI_CARD_NUMBER_INPUT_MAX\}/);
+  assert.match(checkout, /shouldAdvanceCardField/);
+  assert.match(checkout, /expiryRef/);
+  assert.match(checkout, /cvvRef/);
+  assert.match(checkout, /const canPay = Boolean\([\s\S]*configured && customerValid && cardOk && legalAccepted && orderOk && !submitting && tryTotal != null/);
   assert.doesNotMatch(checkout, /disabled=\{!configured/);
 });
 
-test('16-digit PAN passes luhn and is not forced to 20 digits', () => {
+test('16-digit PAN passes luhn and extra digits are dropped', () => {
   function digitsOnly(value) {
     return value.replace(/\D/g, '');
   }
+  function formatCardNumber(value) {
+    return digitsOnly(value)
+      .slice(0, 16)
+      .replace(/(\d{4})(?=\d)/g, '$1 ')
+      .trim();
+  }
   function luhnOk(value) {
     const digits = digitsOnly(value);
-    if (digits.length < 13 || digits.length > 19) return false;
+    if (digits.length !== 16) return false;
     let sum = 0;
     let doubleDigit = false;
     for (let index = digits.length - 1; index >= 0; index -= 1) {
@@ -238,7 +279,27 @@ test('16-digit PAN passes luhn and is not forced to 20 digits', () => {
   assert.equal(sixteen.length, 16);
   assert.equal(luhnOk(sixteen), true);
   assert.equal(luhnOk('4111 1111 1111 1111'), true);
+  assert.equal(formatCardNumber('41111111111111119999'), '4111 1111 1111 1111');
+  assert.equal(digitsOnly(formatCardNumber('4111 1111 1111 1111 999')).length, 16);
   assert.notEqual(sixteen.length, 20);
+});
+
+test('card fields advance from PAN to expiry then CVV', () => {
+  function digitsOnly(value) {
+    return value.replace(/\D/g, '');
+  }
+  function shouldAdvanceCardField(previous, next, filledLength) {
+    return digitsOnly(previous).length < filledLength && digitsOnly(next).length >= filledLength;
+  }
+  assert.equal(shouldAdvanceCardField('4111 1111 1111 111', '4111 1111 1111 1111', 16), true);
+  assert.equal(shouldAdvanceCardField('4111 1111 1111 1111', '4111 1111 1111 1111', 16), false);
+  assert.equal(shouldAdvanceCardField('12 / 2', '12 / 29', 4), true);
+  assert.equal(shouldAdvanceCardField('12 / 29', '12 / 29', 4), false);
+  const panHandler = checkout.slice(checkout.indexOf('id="card-number"'), checkout.indexOf('id="card-expiry"'));
+  const expiryHandler = checkout.slice(checkout.indexOf('id="card-expiry"'), checkout.indexOf('id="card-cvv"'));
+  assert.match(panHandler, /expiryRef/);
+  assert.match(expiryHandler, /cvvRef/);
+  assert.doesNotMatch(panHandler, /cvvRef/);
 });
 
 test('QNB PayFor hash uses SHA1 ASCII then Base64', () => {
@@ -251,10 +312,10 @@ test('QNB PayFor hash uses SHA1 ASCII then Base64', () => {
 test('checkout CTA and card programs stay merchant-driven', () => {
   assert.match(checkout, /Güvenli Ödeme Yap/);
   assert.match(checkout, /Ödeme işlemi başlatılıyor/);
-  assert.match(checkout, /Test modu/);
-  assert.match(checkout, /QNBpay · 3D Secure/);
+  assert.doesNotMatch(checkout, /Test modu|TEST MODU/i);
+  assert.match(checkout, /Tami \/ Garanti BBVA · 3D Secure/);
   assert.match(checkout, /Siparişinizi tamamlamak için kart ve fatura bilgilerinizi girin/);
-  assert.match(checkout, /QNBpay Sanal POS bağlantısı henüz yapılandırılmadı/);
+  assert.match(checkout, /Tami \/ Garanti BBVA ödeme altyapısı henüz tamamlanmadı\. POS\/Terminal aktivasyonu bekleniyor/);
   assert.match(checkout, /KDV Hariç/);
   assert.match(checkout, /href="\/"/);
   assert.doesNotMatch(checkout, /Bu bankaların tamamı kesin desteklenmektedir/);
@@ -268,9 +329,12 @@ test('payment signing secret fails closed in production', () => {
 });
 
 test('no fake success payment shortcut in providers', () => {
-  assert.match(qnbpay, /transaction_status === 'Completed'|ProcReturnCode === '00'|verifyPayforCallback/);
+  const tami = readFileSync(join(root, 'src/lib/payments/tami.ts'), 'utf8');
+  assert.match(tami, /verifyCallbackHash/);
+  assert.match(tami, /\/payment\/complete-3ds/);
+  assert.doesNotMatch(tami, /fakeSuccess|mockPaid/);
   assert.doesNotMatch(qnbpay, /fakeSuccess|mockPaid/);
-  assert.match(service, /QNBpay yapılandırması tamamlanmamış/);
+  assert.match(service, /Tami POS \/ Terminal ID henüz yapılandırılmadı/);
 });
 
 test('payment URLs carry productId not a client price', () => {
@@ -323,5 +387,5 @@ test('checkout applies central 20% VAT server-side', () => {
   assert.match(serviceFile, /vatRatePercent: quote\.vatRatePercent/);
   assert.match(serviceFile, /amountMinor: quote\.totalMinor/);
   assert.match(checkout, /KDV Dahil Toplam/);
-  assert.match(checkout, /Ödenecek Toplam/);
+  assert.match(checkout, /Karttan çekilecek/);
 });

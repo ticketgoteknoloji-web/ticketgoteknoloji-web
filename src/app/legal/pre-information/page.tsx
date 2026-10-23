@@ -86,7 +86,7 @@ export default async function PreInformationPage({ searchParams }: { searchParam
 
       <LegalSection title="Ödeme yöntemi">
         <p>
-          {order ? order.paymentMethod : 'QNBpay / QNB Sanal POS. Kart verileri TicketGo Teknoloji sisteminde tutulmaz.'}
+          {order ? order.paymentMethod : 'Tami / Garanti BBVA Sanal POS. Kart verileri TicketGo Teknoloji sisteminde tutulmaz.'}
         </p>
       </LegalSection>
 
@@ -127,7 +127,7 @@ export default async function PreInformationPage({ searchParams }: { searchParam
 
       <LegalSection title="İade süreci">
         <p>
-          İade hakkı doğduğunda bedel, ödeme yöntemine uygun iade edilir. QNBpay iadeleri ilgili kuruluş
+          İade hakkı doğduğunda bedel, ödeme yöntemine uygun iade edilir. Tami iadeleri ilgili kuruluş
           süreçlerine tabi olabilir. Fiziksel iade adresi: {displayRegistry(COMPANY.returnAddress)}.
         </p>
       </LegalSection>

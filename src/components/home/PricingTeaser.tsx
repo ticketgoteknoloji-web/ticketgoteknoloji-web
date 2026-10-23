@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { BuyButton } from '@/components/BuyButton';
+import { ProductPrice } from '@/components/price/ProductPrice';
 import { isPurchasable, paymentUrl } from '@/lib/commerce';
-import { formatUsd } from '@/lib/money';
 import { pricingCatalog } from '@/lib/pricing';
 
 export function PricingTeaser() {
@@ -22,10 +22,14 @@ export function PricingTeaser() {
           >
             {item.popular ? <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-600">En popüler</p> : null}
             <h3 className="mt-2 text-lg font-semibold text-ink">{item.name}</h3>
-            <p className="mt-3 text-2xl font-semibold text-ink">
-              Başlangıç {formatUsd(item.monthlyPrice ?? 0)}
-              <span className="ml-1 text-sm font-medium text-muted">/ ay</span>
-            </p>
+            <div className="mt-3">
+              <ProductPrice
+                usdPrice={item.monthlyPrice ?? 0}
+                usdFractionDigits={2}
+                prefix={<span className="mr-1 text-sm font-medium text-muted">Başlangıç </span>}
+                periodLabel="/ ay"
+              />
+            </div>
             <p className="mt-2 text-sm leading-6 text-muted">{item.headline}</p>
             {isPurchasable(item.id) ? (
               <BuyButton href={paymentUrl(item.id, 'annual')} className="btn btn-primary mt-5">

@@ -6,6 +6,8 @@ import { DownloadAccessActivator } from '@/components/download/DownloadAccessAct
 import { getStoredPackageByProductId } from '@/lib/downloads/store';
 import { getOrderById } from '@/lib/payments/orders';
 import { toPublicOrder } from '@/lib/payments/service';
+import { formatTryRate } from '@/lib/fx/format';
+import { formatMinor } from '@/lib/money';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -42,7 +44,7 @@ export default async function PaymentSuccessPage({ searchParams }: { searchParam
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-muted">Ödeme yöntemi</dt>
-          <dd className="text-ink">QNBpay</dd>
+          <dd className="text-ink">Tami / Garanti BBVA Sanal POS</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-muted">İşlem durumu</dt>
@@ -52,6 +54,18 @@ export default async function PaymentSuccessPage({ searchParams }: { searchParam
           <dt className="text-muted">Tutar</dt>
           <dd className="text-ink">{paid.amountLabel}</dd>
         </div>
+        {order.originalAmountMinor != null && order.chargedAmountMinor != null ? (
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Katalog fiyatı</dt>
+            <dd className="text-ink">{formatMinor(order.originalAmountMinor, order.originalCurrency || 'USD')}</dd>
+          </div>
+        ) : null}
+        {order.exchangeRate ? (
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Uygulanan TCMB kuru</dt>
+            <dd className="text-ink">1 USD = {formatTryRate(order.exchangeRate)}</dd>
+          </div>
+        ) : null}
       </dl>
 
       {downloadPkg ? <DownloadAccessActivator orderId={order.id} token={order.statusToken} /> : null}

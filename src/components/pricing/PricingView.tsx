@@ -5,14 +5,14 @@ import Image from 'next/image';
 import { Check, Minus, Puzzle } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { BuyButton } from '@/components/BuyButton';
+import { ProductPrice } from '@/components/price/ProductPrice';
 import { OfferingGrid } from '@/components/pricing/OfferingGrid';
 import { isPurchasable, paymentUrl } from '@/lib/commerce';
-import { formatUsd } from '@/lib/money';
 import {
   discountFor,
-  priceLabel,
   pricingCatalog,
   quoteUrl,
+  recurringPrice,
   savingsPercent,
   type BillingPeriod,
 } from '@/lib/pricing';
@@ -159,7 +159,17 @@ export function PricingView() {
                 </th>
                 {pricingCatalog.plans.map((plan) => (
                   <td key={plan.id} className="px-4 py-3 text-muted">
-                    {priceLabel(plan, period)}
+                    {plan.customQuote || plan.monthlyPrice === null ? (
+                      'Özel teklif'
+                    ) : (
+                      <ProductPrice
+                        compact
+                        usdPrice={recurringPrice(plan.monthlyPrice, period, discountFor(plan.category))}
+                        usdFractionDigits={2}
+                        prefix={plan.startingAt ? 'Başlangıç ' : undefined}
+                        showRateInfo={false}
+                      />
+                    )}
                   </td>
                 ))}
               </tr>
@@ -192,9 +202,11 @@ export function PricingView() {
                 </th>
                 {pricingCatalog.plans.map((plan) => (
                   <td key={plan.id} className="px-4 py-3 text-muted">
-                    {ticketOverage[plan.id as keyof typeof ticketOverage]
-                      ? formatUsd(ticketOverage[plan.id as keyof typeof ticketOverage])
-                      : 'Teklif'}
+                    {ticketOverage[plan.id as keyof typeof ticketOverage] ? (
+                      <ProductPrice compact usdPrice={ticketOverage[plan.id as keyof typeof ticketOverage]} usdFractionDigits={2} showRateInfo={false} />
+                    ) : (
+                      'Teklif'
+                    )}
                   </td>
                 ))}
               </tr>
@@ -266,21 +278,22 @@ export function PricingView() {
               </span>
               <h3 className="mt-4 min-h-[3.25rem] text-xl font-semibold leading-snug text-ink">{item.name}</h3>
               <p className="mt-3 min-h-[6rem] line-clamp-4 text-sm leading-6 text-muted">{item.description}</p>
-              <div className="mt-5 min-h-[5.25rem]">
-                <p className="text-2xl font-semibold tracking-tight text-ink">
-                  {item.startingAt ? <span className="mr-1 text-sm font-medium text-muted">Başlangıç </span> : null}
-                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(item.priceUsd ?? item.price)}
-                  {item.periodLabel && (
-                    <span className="ml-1 text-sm font-medium text-muted">{item.periodLabel}</span>
-                  )}
-                </p>
+              <div className="mt-5 min-h-[7.5rem]">
+                <ProductPrice
+                  usdPrice={item.priceUsd ?? item.price}
+                  periodLabel={item.periodLabel}
+                  prefix={item.startingAt ? <span className="mr-1 text-sm font-medium text-muted">Başlangıç </span> : null}
+                />
                 <p className="mt-0.5 text-xs font-medium text-muted">KDV hariç</p>
                 {(item.priceUsd ?? item.price) > 0 && (
                   <p className="mt-1 text-sm text-muted">
                     KDV dahil:{' '}
-                    <span className="font-semibold text-ink">
-                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Math.round((item.priceUsd ?? item.price) * 1.2))}
-                    </span>
+                    <ProductPrice
+                      compact
+                      usdPrice={Math.round((item.priceUsd ?? item.price) * 1.2)}
+                      showRateInfo={false}
+                      className="inline-flex font-semibold text-ink"
+                    />
                     <span className="ml-1 text-xs text-muted">(%20 KDV)</span>
                   </p>
                 )}
@@ -325,7 +338,9 @@ export function PricingView() {
                   <th scope="row" className="px-4 py-3 font-medium text-ink">
                     {row.name}
                   </th>
-                  <td className="px-4 py-3 text-muted">{formatUsd(row.price)}</td>
+                  <td className="px-4 py-3 text-muted">
+                    <ProductPrice compact usdPrice={row.price} usdFractionDigits={2} showRateInfo={false} />
+                  </td>
                   <td className="px-4 py-3 text-muted">{row.notes}</td>
                 </tr>
               ))}

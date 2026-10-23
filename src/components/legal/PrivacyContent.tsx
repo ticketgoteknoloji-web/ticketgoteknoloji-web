@@ -193,7 +193,7 @@ export function PrivacyContent({ omitChrome = false }: { omitChrome?: boolean })
         <h3 className="legal-h3">3. Ödeme ve Finansal İşlem Bilgileri</h3>
         <p className="mt-2 text-muted">
           {COMPANY.websiteDisplay} üzerinden gerçekleştirilebilecek kartlı ödeme işlemleri, ilgili banka ve/veya
-          yetkili ödeme altyapısı üzerinden yürütülmektedir. Ödeme işlemlerinde QNBpay / QNB Sanal POS altyapısı
+          yetkili ödeme altyapısı üzerinden yürütülmektedir. Ödeme işlemlerinde Tami / Garanti BBVA Sanal POS altyapısı
           kullanılmaktadır.
         </p>
         <p className="mt-2 text-muted">
@@ -248,7 +248,7 @@ export function PrivacyContent({ omitChrome = false }: { omitChrome?: boolean })
         <p className="mt-2 text-muted">Gerçek faaliyetlere bağlı olarak alıcı grupları:</p>
         <ul className="mt-1 list-disc space-y-1.5 pl-5 text-muted">
           <li>Bankalar ve ödeme hizmeti sağlayıcıları</li>
-          <li>QNBpay / QNB Sanal POS ödeme altyapısı sağlayıcıları</li>
+          <li>Tami / Garanti BBVA Sanal POS ödeme altyapısı sağlayıcıları</li>
           <li>Muhasebe ve mali müşavirlik hizmet sağlayıcıları</li>
           <li>E-fatura / e-arşiv hizmet sağlayıcıları</li>
           <li>Hosting, sunucu ve bilişim altyapısı sağlayıcıları</li>
@@ -314,7 +314,7 @@ export function PrivacyContent({ omitChrome = false }: { omitChrome?: boolean })
           <li>Tercih çerezleri — kullanıcı tercihleri için kullanılabilir</li>
         </ul>
         <p className="mt-2 text-muted">
-          Reklam veya üçüncü taraf izleme çerezi kullanılmamaktadır. QNBpay ödeme sayfasındaki çerezler ilgili
+          Reklam veya üçüncü taraf izleme çerezi kullanılmamaktadır. Tami 3D Secure sayfasındaki çerezler ilgili
           sağlayıcının kontrolündedir. Ayrıntı için{' '}
           <Link href="/cookies" className="font-semibold text-brand-600">
             Çerez Politikası

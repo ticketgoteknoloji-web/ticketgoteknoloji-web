@@ -8,7 +8,15 @@ export type OrderStatus =
   | 'refunded'
   | 'payment_started';
 
-export type PaymentProviderId = 'qnbpay' | 'iyzico'; // iyzico: legacy stored orders only
+export type PaymentProviderId = 'tami' | 'qnbpay' | 'iyzico'; // qnbpay/iyzico: legacy stored orders only
+
+export type PaymentCard = {
+  holderName: string;
+  number: string;
+  expireMonth: string;
+  expireYear: string;
+  cvv: string;
+};
 
 export type PaymentCustomer = {
   firstName: string;
@@ -39,6 +47,8 @@ export type PaymentAttempt = {
   providerReference: string | null;
   providerTransactionId: string | null;
   responseCode: string | null;
+  mdStatus: string | null;
+  bankReference: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -87,6 +97,13 @@ export type OrderRecord = {
   legalAcceptedAt: string;
   processedTransactionIds?: string[];
   billingAddress?: string;
+  originalAmountMinor?: number;
+  originalCurrency?: string;
+  exchangeRate?: number | null;
+  exchangeRateSource?: string | null;
+  exchangeRateDate?: string | null;
+  chargedAmountMinor?: number | null;
+  chargedCurrency?: string | null;
   legalAcceptance?: {
     distanceSalesVersion: string;
     preInformationVersion: string;
@@ -104,10 +121,11 @@ export type CreatePaymentInput = {
   ip: string;
   installment?: number;
   cardProgram?: string;
+  card?: PaymentCard;
 };
 
 export type CreatePaymentResult =
-  | { ok: true; redirectUrl: string; providerReference: string }
+  | { ok: true; redirectUrl: string; providerReference: string; threeDsHtml?: string }
   | { ok: false; code: 'not_configured' | 'provider_error'; message: string };
 
 export type VerifyPaymentInput = {

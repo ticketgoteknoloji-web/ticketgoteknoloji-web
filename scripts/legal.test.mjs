@@ -26,7 +26,7 @@ test('distance sales contract has required sections', () => {
     '7. Cayma hakkı',
     '10. Cayma hakkının istisnaları',
     '14. Uyuşmazlıklar',
-    'QNBpay',
+    'Tami',
   ]) {
     assert.match(distance, new RegExp(heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
@@ -55,6 +55,8 @@ test('KVKK and privacy are separate documents', () => {
   assert.match(kvkk, /CompanyInfoPanel/);
   assert.match(privacy, /Kişisel Verilerin İşlenme Amaçları/);
   assert.match(privacy, /saklamayı amaçlamaz/);
+  assert.match(privacy, /Gizlilik/);
+  assert.match(privacy, /Tami \/ Garanti BBVA/);
   assert.doesNotMatch(privacy, /title="Hukuki sebepler"/);
 });
 
@@ -87,7 +89,8 @@ test('company registry placeholders are centralized', () => {
   assert.match(site, /0843093110800001/);
   assert.match(site, /Gümbet Mah\. Mister Hadi Sok\. No:2-A1 Bodrum\/MUĞLA/);
   assert.match(distance, /SATICI BİLGİLERİ/);
-  assert.match(versions, /2026\.08-v1/);
+  assert.match(kvkk, /CompanyInfoPanel/);
+  assert.match(versions, /2026\.08-v2/);
 });
 
 test('legal shell and footer are corporate-only', () => {

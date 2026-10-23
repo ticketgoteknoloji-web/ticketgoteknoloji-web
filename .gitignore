@@ -2,7 +2,12 @@ node_modules
 .next
 out
 .env
+.env.local
+.env.production
+.env.development
+.env.development.local
 .env*.local
+.env.*.local
 .data
 .storage
 storage/downloads/*

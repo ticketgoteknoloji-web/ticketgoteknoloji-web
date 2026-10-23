@@ -241,7 +241,7 @@ export const processSteps: SolutionDetail[] = [
     integrationsLabel: 'Örnek entegrasyon alanları',
     integrations: [
       'Ödeme Sistemleri',
-      'QNBpay / Sanal POS',
+      'Tami / Garanti BBVA Sanal POS',
       'CRM',
       'ERP',
       'SMS',

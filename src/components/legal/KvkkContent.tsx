@@ -91,7 +91,7 @@ export function KvkkContent({ omitChrome = false }: Props) {
       <LegalSection id="aktarim" title="Aktarım" level={3}>
         <p>Gerçek aktarım yapısına göre alıcı grupları:</p>
         <ul className="list-disc space-y-1.5 pl-5">
-          <li>Ödeme hizmeti sağlayıcıları: QNBpay / QNB Sanal POS — ödeme oturumu ve sonuç doğrulaması.</li>
+          <li>Ödeme hizmeti sağlayıcıları: Tami / Garanti BBVA Sanal POS — ödeme oturumu ve sonuç doğrulaması.</li>
           <li>Bankalar / finansal kuruluşlar: kartın ait olduğu kuruluş, ödeme sağlayıcısı aracılığıyla.</li>
           <li>Bilişim / altyapı hizmet sağlayıcıları: hosting ve e-posta iletimi.</li>
           <li>Mali müşavirlik: fatura ve yasal defter süreçleri gerektiğinde.</li>

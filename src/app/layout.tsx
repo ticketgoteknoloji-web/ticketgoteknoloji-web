@@ -3,6 +3,8 @@ import { DM_Sans } from 'next/font/google';
 import { AnimatedLineBackground } from '@/components/AnimatedLineBackground';
 import { AppChrome } from '@/components/AppChrome';
 import { FloatingWhatsApp } from '@/components/FloatingWhatsApp';
+import { FxProvider } from '@/components/price/FxProvider';
+import { getUsdTryQuote } from '@/services/exchange-rate';
 import { BRAND_LEGAL_NAME, BRAND_SITE_URL } from '@/lib/site';
 import './globals.css';
 
@@ -12,6 +14,8 @@ const sansFont = DM_Sans({
   variable: '--font-sans',
   display: 'swap',
 });
+
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   metadataBase: new URL(BRAND_SITE_URL),
@@ -51,12 +55,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const fx = await getUsdTryQuote();
   return (
     <html lang="tr" className={sansFont.variable}>
       <body className="font-sans antialiased">
         <AnimatedLineBackground />
-        <AppChrome>{children}</AppChrome>
+        <FxProvider initial={fx}>
+          <AppChrome>{children}</AppChrome>
+        </FxProvider>
         <FloatingWhatsApp />
       </body>
     </html>

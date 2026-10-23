@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
-    "test": "node --test scripts/pricing.test.mjs scripts/payments.test.mjs scripts/legal.test.mjs scripts/downloads.test.mjs"
+    "test": "node --test scripts/pricing.test.mjs scripts/payments.test.mjs scripts/legal.test.mjs scripts/downloads.test.mjs scripts/tami.test.mjs scripts/fx.test.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.31.0",

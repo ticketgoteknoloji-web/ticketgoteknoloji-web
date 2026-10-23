@@ -1,9 +1,40 @@
 import { randomBytes } from 'crypto';
-import { getPaymentConfig, paymentEnv, publicSiteUrl, qnbpayConfig } from '@/config/payment';
+import {
+  getPaymentConfig,
+  hasUsableTamiPosId,
+  isUsableTamiCredential,
+  paymentEnv,
+  publicSiteUrl,
+  qnbpayConfig,
+  resolveTamiPosId,
+  tamiConfig,
+} from '@/config/payment';
 import { BRAND_SITE_URL } from '@/lib/site';
 import type { PaymentProviderId } from '@/lib/payments/types';
 
-export { getPaymentConfig, paymentEnv, publicSiteUrl, qnbpayConfig };
+export {
+  getPaymentConfig,
+  hasUsableTamiPosId,
+  isUsableTamiCredential,
+  paymentEnv,
+  publicSiteUrl,
+  qnbpayConfig,
+  resolveTamiPosId,
+  tamiConfig,
+};
+
+/** Tami is ready only when merchant, POS, secret, kid and k are all real, non-placeholder values. */
+export function isTamiReady(): boolean {
+  const cfg = tamiConfig();
+  return Boolean(
+    cfg.configured &&
+      isUsableTamiCredential(cfg.merchantId) &&
+      hasUsableTamiPosId(cfg.posId, cfg.merchantId) &&
+      isUsableTamiCredential(cfg.secretKey) &&
+      isUsableTamiCredential(cfg.kid) &&
+      isUsableTamiCredential(cfg.k)
+  );
+}
 
 export function publicBaseUrl(request?: Request): string {
   const paymentBase = process.env.PAYMENT_PUBLIC_BASE_URL?.trim();
@@ -37,11 +68,15 @@ function isSafeDevOrigin(value: string): boolean {
 }
 
 export function isProviderConfigured(id: PaymentProviderId): boolean {
-  return id === 'qnbpay' && qnbpayConfig().configured;
+  if (id === 'tami') return isTamiReady();
+  if (id === 'qnbpay') return qnbpayConfig().configured;
+  return false;
 }
 
 export function isProviderEnabled(id: PaymentProviderId): boolean {
-  return id === 'qnbpay' && getPaymentConfig().qnbpay.enabled;
+  if (id === 'tami') return getPaymentConfig().tami.enabled;
+  if (id === 'qnbpay') return getPaymentConfig().qnbpay.enabled;
+  return false;
 }
 
 export function newIdempotencyKey(): string {

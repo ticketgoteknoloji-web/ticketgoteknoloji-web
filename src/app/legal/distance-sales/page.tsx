@@ -89,7 +89,7 @@ export default async function DistanceSalesPage({ searchParams }: { searchParams
       <LegalSection title="4. Sipariş ve sözleşmenin kurulması">
         <p>
           Alıcı ürün veya hizmeti seçer, sipariş özetini ve toplam bedeli görür, işbu sözleşme ile ön bilgilendirme
-          formunu inceler, siparişe ve ödeme yükümlülüğüne ilişkin kabulü verir ve QNBpay / QNB Sanal POS üzerinden
+          formunu inceler, siparişe ve ödeme yükümlülüğüne ilişkin kabulü verir ve Tami / Garanti BBVA Sanal POS üzerinden
           ödemeyi tamamlar. Sözleşme, Alıcı’nın bu kabulü ve ödemenin ödeme kuruluşu nezdinde başlatılmasıyla elektronik
           ortamda kurulmuş olur. Sipariş kaydında kabul edilen belge sürümü ve kabul zamanı saklanır.
         </p>
@@ -97,10 +97,10 @@ export default async function DistanceSalesPage({ searchParams }: { searchParams
 
       <LegalSection title="5. Ödeme">
         <p>
-          Ödeme; QNBpay / QNB Sanal POS altyapısı üzerinden, QNB’nin barındırdığı güvenli 3D Host ödeme sayfası ile
-          alınır. Kart numarası, CVV/CVC ve son kullanma tarihi {COMPANY.legalName} tarafından
-          toplanmaz, saklanmaz, loglanmaz ve analitik sistemlerine gönderilmez. Ödeme işleminin teknik sonucu, ilgili
-          ödeme kuruluşundan sunucu tarafında doğrulanır. PCI veya benzeri sertifika iddiası bu metinde yer almaz.
+          Ödeme; Tami / Garanti BBVA Sanal POS altyapısı üzerinden 3D Secure ile alınır. Kart bilgileri yalnızca
+          ödeme işlemini başlatmak için Tami’ye iletilir; {COMPANY.legalName} tarafından veritabanına, loglara veya
+          analitik sistemlerine kaydedilmez. CVV saklanmaz. Ödeme işleminin teknik sonucu, ilgili ödeme kuruluşundan
+          sunucu tarafında doğrulanır. PCI veya benzeri sertifika iddiası bu metinde yer almaz.
         </p>
       </LegalSection>
 
@@ -148,7 +148,7 @@ export default async function DistanceSalesPage({ searchParams }: { searchParams
       <LegalSection title="9. İade">
         <p>
           İade hakkı oluşan durumlarda bedel iadesi, yürürlükteki mevzuat ve kullanılan ödeme yöntemine uygun biçimde
-          yapılır. QNBpay üzerinden tahsil edilen tutarların iadesi, ilgili ödeme altyapısının süreçlerine
+          yapılır. Tami üzerinden tahsil edilen tutarların iadesi, ilgili ödeme altyapısının süreçlerine
           ve banka/kart kuruluşu takvimine tabi olabilir. Fiziksel mal iadesi kural olarak söz konusu değildir; iade
           iletişim adresi: {displayRegistry(COMPANY.returnAddress)}.
         </p>
