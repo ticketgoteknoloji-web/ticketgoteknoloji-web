@@ -1,7 +1,6 @@
-import { mkdir, readFile, rename, writeFile } from 'fs/promises';
-import { existsSync, readFileSync } from 'fs';
-import path from 'path';
+import { readFileSync } from 'fs';
 import { randomBytes } from 'crypto';
+import { DataFileError, readJsonFile, withLockedUpdate, writeJsonAtomic } from '@/lib/persistence/locked-json';
 import {
   formatPlatformLabels,
   parsePlatformIds,
@@ -68,32 +67,48 @@ function normalizeDb(raw: Partial<DownloadsDb>): DownloadsDb {
   };
 }
 
-async function readDb(): Promise<DownloadsDb> {
-  try {
-    const raw = await readFile(downloadsDataPath(), 'utf8');
-    return normalizeDb(JSON.parse(raw) as Partial<DownloadsDb>);
-  } catch {
-    return emptyDb();
+function parseDownloadsDb(value: unknown): DownloadsDb {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new DataFileError('invalid', 'Download store schema is invalid');
   }
+  const record = value as Partial<DownloadsDb>;
+  if (!Array.isArray(record.packages)) {
+    throw new DataFileError('invalid', 'Download store schema is invalid');
+  }
+  return normalizeDb(record);
+}
+
+async function readDb(): Promise<DownloadsDb> {
+  const loaded = await readJsonFile(downloadsDataPath());
+  if (loaded.missing) return emptyDb();
+  return parseDownloadsDb(loaded.value);
 }
 
 function readDbSync(): DownloadsDb {
+  const file = downloadsDataPath();
+  let raw: string;
   try {
-    if (!existsSync(downloadsDataPath())) return emptyDb();
-    const raw = readFileSync(downloadsDataPath(), 'utf8');
-    return normalizeDb(JSON.parse(raw) as Partial<DownloadsDb>);
-  } catch {
-    return emptyDb();
+    raw = readFileSync(file, 'utf8');
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? (error as { code?: string }).code : '';
+    if (code === 'ENOENT') return emptyDb();
+    throw new DataFileError('unreadable', 'Download store cannot be read');
+  }
+  if (!raw.trim()) throw new DataFileError('invalid', 'Download store is empty');
+  try {
+    return parseDownloadsDb(JSON.parse(raw) as unknown);
+  } catch (error) {
+    if (error instanceof DataFileError) throw error;
+    throw new DataFileError('invalid', 'Download store is not valid JSON');
   }
 }
 
 async function writeDb(db: DownloadsDb): Promise<void> {
-  const finalPath = downloadsDataPath();
-  const dir = path.dirname(finalPath);
-  await mkdir(dir, { recursive: true });
-  const tmp = `${finalPath}.${randomBytes(4).toString('hex')}.tmp`;
-  await writeFile(tmp, JSON.stringify(db, null, 2), 'utf8');
-  await rename(tmp, finalPath);
+  await writeJsonAtomic(downloadsDataPath(), db);
+}
+
+function locked<T>(work: () => Promise<T>): Promise<T> {
+  return enqueue(() => withLockedUpdate(downloadsDataPath(), work));
 }
 
 export async function appendDownloadAudit(entry: {
@@ -103,7 +118,7 @@ export async function appendDownloadAudit(entry: {
   fileSize?: number;
   admin?: string;
 }): Promise<void> {
-  return enqueue(async () => {
+  return locked(async () => {
     const db = await readDb();
     db.audit.push({
       id: `AUD-${randomBytes(6).toString('hex')}`,
@@ -193,7 +208,7 @@ export async function saveUploadedPackage(
   adminEmail: string,
   event: 'upload' | 'update' = 'upload'
 ): Promise<StoredDownloadPackage> {
-  return enqueue(async () => {
+  return locked(async () => {
     const db = await readDb();
     const index = db.packages.findIndex((item) => item.productId === pkg.productId);
     if (index >= 0) db.packages[index] = pkg;
@@ -220,7 +235,7 @@ export async function updatePackageSaleOpen(
 ): Promise<StoredDownloadPackage | null> {
   const id = productId.trim();
   if (!id || id.includes('..') || id.includes('/') || id.includes('\\')) return null;
-  return enqueue(async () => {
+  return locked(async () => {
     const db = await readDb();
     const index = db.packages.findIndex((item) => item.productId === id || item.id === id);
     if (index < 0) return null;
@@ -253,7 +268,7 @@ export async function grantDownloadEntitlement(input: {
   if (!pkg) return null;
   if (pkg.productId !== input.productId) return null;
 
-  return enqueue(async () => {
+  return locked(async () => {
     const db = await readDb();
     const existing = db.entitlements.find(
       (item) => item.orderId === input.orderId && item.productId === input.productId && item.status === 'active'
@@ -282,7 +297,7 @@ export async function grantDownloadEntitlement(input: {
 export async function revokeDownloadEntitlementsForOrder(orderId: string): Promise<number> {
   const id = orderId.trim();
   if (!id) return 0;
-  return enqueue(async () => {
+  return locked(async () => {
     const db = await readDb();
     let count = 0;
     db.entitlements = db.entitlements.map((item) => {

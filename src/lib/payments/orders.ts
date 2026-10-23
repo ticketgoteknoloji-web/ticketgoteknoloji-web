@@ -1,11 +1,11 @@
-import { mkdir, readFile, rename, writeFile } from 'fs/promises';
 import path from 'path';
 import { randomBytes } from 'crypto';
+import { DataFileError, readJsonFile, resolveAbsoluteDataFile, withLockedUpdate, writeJsonAtomic } from '@/lib/persistence/locked-json';
 import type { OrderRecord, PaymentAttempt, PaymentAuditEntry } from '@/lib/payments/types';
 
-const DATA_DIR = path.join(process.cwd(), '.data');
-const FILE = path.join(DATA_DIR, 'payments.json');
-const LEGACY = path.join(DATA_DIR, 'orders.json');
+export function paymentOrdersPath(): string {
+  return resolveAbsoluteDataFile(process.env.PAYMENT_ORDERS_FILE, path.join(process.cwd(), '.data', 'payments.json'));
+}
 
 type PaymentDb = {
   orders: OrderRecord[];
@@ -71,34 +71,43 @@ function normalizeOrder(raw: OrderRecord): OrderRecord {
   };
 }
 
-async function readDb(): Promise<PaymentDb> {
-  try {
-    const raw = await readFile(FILE, 'utf8');
-    const parsed = JSON.parse(raw) as Partial<PaymentDb>;
-    return {
-      orders: Array.isArray(parsed.orders) ? parsed.orders.map(normalizeOrder) : [],
-      attempts: Array.isArray(parsed.attempts) ? parsed.attempts.map(normalizeAttempt) : [],
-      audit: Array.isArray(parsed.audit) ? parsed.audit : [],
-    };
-  } catch {
-    try {
-      const legacy = JSON.parse(await readFile(LEGACY, 'utf8')) as OrderRecord[];
-      return {
-        orders: Array.isArray(legacy) ? legacy.map(normalizeOrder) : [],
-        attempts: [],
-        audit: [],
-      };
-    } catch {
-      return emptyDb();
-    }
+function parsePaymentDb(value: unknown): PaymentDb {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new DataFileError('invalid', 'Payment store schema is invalid');
   }
+  const record = value as Partial<PaymentDb>;
+  if (!Array.isArray(record.orders)) {
+    throw new DataFileError('invalid', 'Payment store schema is invalid');
+  }
+  return {
+    orders: record.orders.map(normalizeOrder),
+    attempts: Array.isArray(record.attempts) ? record.attempts.map(normalizeAttempt) : [],
+    audit: Array.isArray(record.audit) ? record.audit : [],
+  };
+}
+
+async function readDb(): Promise<PaymentDb> {
+  const file = paymentOrdersPath();
+  const loaded = await readJsonFile(file);
+  if (!loaded.missing) return parsePaymentDb(loaded.value);
+  const legacy = await readJsonFile(path.join(path.dirname(file), 'orders.json'));
+  if (legacy.missing) return emptyDb();
+  if (!Array.isArray(legacy.value)) {
+    throw new DataFileError('invalid', 'Legacy order file is invalid');
+  }
+  return {
+    orders: legacy.value.map((item) => normalizeOrder(item as OrderRecord)),
+    attempts: [],
+    audit: [],
+  };
 }
 
 async function writeDb(db: PaymentDb): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
-  const tmp = `${FILE}.${randomBytes(4).toString('hex')}.tmp`;
-  await writeFile(tmp, JSON.stringify(db, null, 2), 'utf8');
-  await rename(tmp, FILE);
+  await writeJsonAtomic(paymentOrdersPath(), db);
+}
+
+function locked<T>(work: () => Promise<T>): Promise<T> {
+  return enqueue(() => withLockedUpdate(paymentOrdersPath(), work));
 }
 
 export function createOrderId(): string {
@@ -111,7 +120,7 @@ export function createAttemptId(): string {
 }
 
 export async function saveOrder(order: OrderRecord): Promise<OrderRecord> {
-  return enqueue(async () => {
+  return locked(async () => {
     const db = await readDb();
     const next = normalizeOrder(order);
     const index = db.orders.findIndex((item) => item.id === next.id);
@@ -147,7 +156,7 @@ export async function getOrderByIdempotency(key: string): Promise<OrderRecord | 
 }
 
 export async function updateOrder(id: string, patch: Partial<OrderRecord>): Promise<OrderRecord | null> {
-  return enqueue(async () => {
+  return locked(async () => {
     const db = await readDb();
     const index = db.orders.findIndex((item) => item.id === id);
     if (index < 0) return null;
@@ -164,7 +173,7 @@ export async function updateOrder(id: string, patch: Partial<OrderRecord>): Prom
 }
 
 export async function saveAttempt(attempt: PaymentAttempt): Promise<PaymentAttempt> {
-  return enqueue(async () => {
+  return locked(async () => {
     const db = await readDb();
     const index = db.attempts.findIndex((item) => item.id === attempt.id);
     if (index >= 0) db.attempts[index] = attempt;
@@ -175,7 +184,7 @@ export async function saveAttempt(attempt: PaymentAttempt): Promise<PaymentAttem
 }
 
 export async function updateAttempt(id: string, patch: Partial<PaymentAttempt>): Promise<PaymentAttempt | null> {
-  return enqueue(async () => {
+  return locked(async () => {
     const db = await readDb();
     const index = db.attempts.findIndex((item) => item.id === id);
     if (index < 0) return null;
@@ -198,7 +207,7 @@ export async function getLatestAttempt(orderId: string): Promise<PaymentAttempt 
 }
 
 export async function appendAudit(entry: Omit<PaymentAuditEntry, 'id' | 'createdAt'> & { id?: string; createdAt?: string }): Promise<void> {
-  await enqueue(async () => {
+  await locked(async () => {
     const db = await readDb();
     db.audit.push({
       id: entry.id ?? `AUD-${randomBytes(6).toString('hex')}`,

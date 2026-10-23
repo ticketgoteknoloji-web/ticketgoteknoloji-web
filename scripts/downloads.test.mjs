@@ -254,9 +254,11 @@ test('private storage is not under public', () => {
 test('isolated free package metadata fixture validates expected shape', () => {
   assert.match(gitignore, /^\.data$/m);
   assert.match(configSrc, /DOWNLOAD_STORAGE_DIR/);
+  assert.match(configSrc, /DOWNLOAD_DATA_FILE/);
   assert.match(configSrc, /downloads\.json/);
   assert.match(storeSrc, /emptyDb\(\)/);
-  assert.match(storeSrc, /catch \{\s*return emptyDb\(\);/s);
+  assert.match(storeSrc, /ENOENT/);
+  assert.doesNotMatch(storeSrc, /catch \{\s*return emptyDb\(\);/s);
 
   const content = 'TicketGo Teknoloji — isolated test fixture only.\n';
   const checksum = createHash('sha256').update(content).digest('hex');

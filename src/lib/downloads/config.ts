@@ -31,7 +31,12 @@ export const DOWNLOAD_ADMIN_COOKIE = 'tg_dl_admin';
 export const DOWNLOAD_ACCESS_COOKIE = 'tg_dl_access';
 
 export function downloadsDataPath(): string {
-  return path.join(process.cwd(), '.data', 'downloads.json');
+  const raw = process.env.DOWNLOAD_DATA_FILE?.trim() ?? '';
+  if (!raw) return path.join(process.cwd(), '.data', 'downloads.json');
+  if (!path.isAbsolute(raw)) {
+    throw new Error('DOWNLOAD_DATA_FILE must be an absolute path');
+  }
+  return path.resolve(raw);
 }
 
 /** @deprecated Use resolveDownloadStorageDir from storage.ts */
