@@ -130,7 +130,7 @@ export function getPaymentConfig() {
     }
     return { kid: tamiUsername, k: password };
   })();
-  const tamiEnabled = flag(process.env.TAMI_ENABLED, true);
+  const tamiEnabled = flag(process.env.TAMI_ENABLED, false);
   const tamiConfigured = Boolean(
     tamiEnabled &&
       isUsableTamiCredential(tamiMerchantId) &&
