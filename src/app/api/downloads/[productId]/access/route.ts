@@ -97,6 +97,14 @@ export async function GET(request: Request, { params }: Params) {
 
     if (order?.status === 'refunded' || order?.status === 'cancelled' || order?.status === 'failed') {
       await revokeDownloadEntitlementsForOrder(entitlement.orderId);
+      if (pkg.saleOpen === false) {
+        return jsonAccess({
+          productId: pkg.productId,
+          state: 'sale_closed',
+          canDownload: false,
+          label: 'Satışa Kapalı',
+        });
+      }
       return jsonAccess({
         productId: pkg.productId,
         state: order.status === 'failed' ? 'payment_failed' : 'purchase_required',
@@ -119,6 +127,15 @@ export async function GET(request: Request, { params }: Params) {
         label: 'Doğrulanıyor...',
       });
     }
+  }
+
+  if (pkg.saleOpen === false) {
+    return jsonAccess({
+      productId: pkg.productId,
+      state: 'sale_closed',
+      canDownload: false,
+      label: 'Satışa Kapalı',
+    });
   }
 
   return jsonAccess({

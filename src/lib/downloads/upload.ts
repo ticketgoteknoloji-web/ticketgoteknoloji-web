@@ -11,6 +11,7 @@ import {
   validateUploadFile,
 } from '@/lib/downloads/config';
 import { deleteStoredFileSafe, DownloadStorageError, writeDownloadFile } from '@/lib/downloads/storage';
+import { saleOpenForSave } from '@/lib/downloads/sale';
 import { formatBytes, getStoredPackageByProductId, saveUploadedPackage } from '@/lib/downloads/store';
 import type { StoredDownloadPackage } from '@/lib/downloads/types';
 
@@ -27,6 +28,8 @@ export async function persistAdminUpload(input: {
   priceUsd: number | null;
   currency: string;
   published: boolean;
+  /** Omitted on create → Satışa Kapalı. Omitted on replace → keep the stored choice. */
+  saleOpen?: boolean;
   /** When set, replaces an existing product after new file is safely written. */
   replaceProductId?: string | null;
   file: File;
@@ -107,6 +110,7 @@ export async function persistAdminUpload(input: {
     uploadedBy: input.adminEmail,
     published: input.published,
     status: input.published ? 'published' : 'unpublished',
+    saleOpen: saleOpenForSave(input.saleOpen, existing?.saleOpen),
   };
 
   const saved = await saveUploadedPackage(pkg, input.adminEmail, existing ? 'update' : 'upload');

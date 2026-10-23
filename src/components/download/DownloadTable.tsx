@@ -76,6 +76,9 @@ function paymentBadge(state: string | undefined) {
   if (state === 'price_undefined') {
     return <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">Fiyat yok</span>;
   }
+  if (state === 'sale_closed') {
+    return <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">Satışa Kapalı</span>;
+  }
   if (state === 'payment_failed') {
     return <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-800">Ödeme başarısız</span>;
   }
@@ -91,8 +94,44 @@ export function DownloadTable() {
   const [platform, setPlatform] = useState<DownloadPlatformFilter>('all');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [adminAuthed, setAdminAuthed] = useState(false);
+  const [salePendingId, setSalePendingId] = useState<string | null>(null);
+  const [saleError, setSaleError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const searchId = useId();
+
+  const changeSale = useCallback(async (pkg: PublicDownloadPackage, saleOpen: boolean) => {
+    if (!adminAuthed || salePendingId) return;
+    if (pkg.saleOpen === saleOpen) return;
+    setSalePendingId(pkg.productId);
+    setSaleError(null);
+    try {
+      const res = await fetch('/api/downloads/admin/sale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: pkg.productId, saleOpen }),
+      });
+      const json = (await res.json()) as { error?: string; package?: PublicDownloadPackage };
+      if (!res.ok || !json.package || typeof json.package.saleOpen !== 'boolean') {
+        setSaleError(json.error || 'Satış durumu güncellenemedi.');
+        return;
+      }
+      const saved = json.package;
+      setPackages((current) => current.map((item) => (item.productId === saved.productId ? { ...item, ...saved } : item)));
+      try {
+        const accessRes = await fetch(`/api/downloads/${encodeURIComponent(saved.productId)}/access`, { cache: 'no-store' });
+        if (accessRes.ok) {
+          const accessJson = (await accessRes.json()) as AccessInfo;
+          setAccessMap((current) => ({ ...current, [saved.productId]: accessJson }));
+        }
+      } catch {
+        // The saved package flag still hides or shows purchase. Access refresh can retry on the next list load.
+      }
+    } catch {
+      setSaleError('Satış durumu güncellenemedi.');
+    } finally {
+      setSalePendingId(null);
+    }
+  }, [adminAuthed, salePendingId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -238,6 +277,12 @@ export function DownloadTable() {
             </div>
           </div>
 
+          {saleError ? (
+            <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+              {saleError}
+            </p>
+          ) : null}
+
           {/* Desktop table */}
           <div className="mt-5 hidden overflow-hidden rounded-2xl border border-line bg-white shadow-soft lg:block">
             <div className="overflow-x-auto">
@@ -252,6 +297,7 @@ export function DownloadTable() {
                     <th scope="col" className="px-4 py-3.5">Dosya Türü</th>
                     <th scope="col" className="px-4 py-3.5">Boyut</th>
                     <th scope="col" className="px-4 py-3.5">Fiyat</th>
+                    <th scope="col" className="px-4 py-3.5">Satış Durumu</th>
                     <th scope="col" className="px-4 py-3.5">Ödeme Durumu</th>
                     <th scope="col" className="px-4 py-3.5">Yükle</th>
                     <th scope="col" className="px-4 py-3.5 text-right">İndir</th>
@@ -282,6 +328,14 @@ export function DownloadTable() {
                             : pkg.priceUsd === 0
                               ? 'Ücretsiz'
                               : formatMoney(pkg.priceUsd, pkg.currency || 'USD')}
+                        </td>
+                        <td className="px-4 py-4 align-top">
+                          <SaleStatusControl
+                            pkg={pkg}
+                            admin={adminAuthed}
+                            pending={salePendingId === pkg.productId}
+                            onChange={(saleOpen) => void changeSale(pkg, saleOpen)}
+                          />
                         </td>
                         <td className="px-4 py-4 align-top">{paymentBadge(access?.state)}</td>
                         <td className="px-4 py-4 align-top">
@@ -336,6 +390,17 @@ export function DownloadTable() {
                       <div><dt className="text-[11px] text-muted">Tür</dt><dd className="font-medium text-ink">{pkg.fileType}</dd></div>
                       <div><dt className="text-[11px] text-muted">Boyut</dt><dd className="font-medium text-ink">{pkg.fileSize}</dd></div>
                       <div><dt className="text-[11px] text-muted">Fiyat</dt><dd className="font-medium text-ink">{pkg.priceUsd == null ? 'Fiyat tanımlanmadı' : pkg.priceUsd === 0 ? 'Ücretsiz' : formatMoney(pkg.priceUsd, pkg.currency || 'USD')}</dd></div>
+                      <div className="col-span-2">
+                        <dt className="text-[11px] text-muted">Satış Durumu</dt>
+                        <dd className="mt-1">
+                          <SaleStatusControl
+                            pkg={pkg}
+                            admin={adminAuthed}
+                            pending={salePendingId === pkg.productId}
+                            onChange={(saleOpen) => void changeSale(pkg, saleOpen)}
+                          />
+                        </dd>
+                      </div>
                       <div><dt className="text-[11px] text-muted">Ödeme</dt><dd className="mt-0.5">{paymentBadge(access?.state)}</dd></div>
                     </dl>
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -361,6 +426,49 @@ export function DownloadTable() {
         onAuthenticated={() => setAdminAuthed(true)}
         onUploaded={() => void refresh()}
       />
+    </div>
+  );
+}
+
+function SaleStatusControl({
+  pkg,
+  admin,
+  pending,
+  onChange,
+}: {
+  pkg: PublicDownloadPackage;
+  admin: boolean;
+  pending: boolean;
+  onChange: (saleOpen: boolean) => void;
+}) {
+  const open = pkg.saleOpen !== false;
+  if (!admin) {
+    return (
+      <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${open ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+        {open ? 'Satışa Açık' : 'Satışa Kapalı'}
+      </span>
+    );
+  }
+  return (
+    <div className="inline-flex rounded-xl border border-line p-0.5" role="group" aria-label={`${pkg.name} satış durumu`}>
+      <button
+        type="button"
+        className={`min-h-9 rounded-lg px-2.5 text-[11px] font-semibold ${open ? 'bg-emerald-600 text-white' : 'text-slate-600'}`}
+        aria-pressed={open}
+        disabled={pending || open}
+        onClick={() => onChange(true)}
+      >
+        Satışa Açık
+      </button>
+      <button
+        type="button"
+        className={`min-h-9 rounded-lg px-2.5 text-[11px] font-semibold ${!open ? 'bg-slate-700 text-white' : 'text-slate-600'}`}
+        aria-pressed={!open}
+        disabled={pending || !open}
+        onClick={() => onChange(false)}
+      >
+        Satışa Kapalı
+      </button>
     </div>
   );
 }
@@ -416,6 +524,14 @@ function DownloadAction({
     return (
       <button type="button" className="btn btn-secondary min-h-11 px-4" disabled aria-disabled="true">
         Fiyat tanımlanmadı
+      </button>
+    );
+  }
+
+  if (pkg.saleOpen === false && pkg.priceUsd !== 0) {
+    return (
+      <button type="button" className="btn btn-secondary min-h-11 px-4" disabled aria-disabled="true">
+        Satışa Kapalı
       </button>
     );
   }

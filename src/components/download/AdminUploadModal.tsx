@@ -479,12 +479,27 @@ export function AdminUploadModal({
                     type="number"
                     min={0}
                     step="0.01"
-                    placeholder="Boş = satışa kapalı"
+                    placeholder="Boş = fiyat tanımlanmadı"
                     disabled={pending}
                     className="mt-1.5 h-11 w-full rounded-xl border border-line px-3 text-sm sm:max-w-xs"
                   />
                 </label>
               </div>
+
+              <fieldset className="block text-sm" disabled={pending}>
+                <legend className="font-medium text-ink">Satış Durumu</legend>
+                <p className="mt-1 text-xs text-muted">Yeni paketler satışa kapalı kaydedilir. Satışa açık seçimi satın almayı başlatır.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-medium text-ink">
+                    <input type="radio" name="saleStatus" value="closed" defaultChecked className="h-4 w-4 border-line text-brand-600" />
+                    Satışa Kapalı
+                  </label>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-medium text-ink">
+                    <input type="radio" name="saleStatus" value="open" className="h-4 w-4 border-line text-brand-600" />
+                    Satışa Açık
+                  </label>
+                </div>
+              </fieldset>
 
               <div className="block text-sm">
                 <span className="font-medium text-ink" id={`${fileInputId}-label`}>

@@ -120,12 +120,16 @@ export function hashDownloadAdminCode(code: string): string {
   return `scrypt$${salt}$${hash}`;
 }
 
-export function verifyDownloadAdminCode(code: string, stored: string): boolean {
-  if (!code || !stored) return false;
+export function isValidAdminCodeHash(stored: string): boolean {
   const parts = stored.split('$');
   if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
   const [, salt, expectedHex] = parts;
-  if (!salt || !expectedHex) return false;
+  return /^[a-f0-9]{32}$/i.test(salt) && /^[a-f0-9]{128}$/i.test(expectedHex);
+}
+
+export function verifyDownloadAdminCode(code: string, stored: string): boolean {
+  if (!code || !stored || !isValidAdminCodeHash(stored)) return false;
+  const [, salt, expectedHex] = stored.split('$');
   try {
     const actual = scryptSync(code, salt, 64);
     const expected = Buffer.from(expectedHex, 'hex');

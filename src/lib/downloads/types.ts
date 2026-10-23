@@ -37,6 +37,11 @@ export type StoredDownloadPackage = {
   uploadedBy: string;
   published: boolean;
   status: DownloadPackageStatus;
+  /**
+   * Whether new purchases may start. Independent of `published` and `priceUsd`.
+   * false = Satışa Kapalı. Existing entitlements are not revoked by this flag.
+   */
+  saleOpen: boolean;
 };
 
 export type DownloadEntitlement = {
@@ -86,7 +91,9 @@ export type PublicDownloadPackage = {
   currency: string;
   checksumSha256: string;
   fileAvailable: boolean;
-  /** true when priced > 0 and file available */
+  /** true when the admin has opened the package for new purchases */
+  saleOpen: boolean;
+  /** true when priced > 0, file available, and saleOpen */
   purchasable: boolean;
   /** true when price is exactly 0 */
   free: boolean;
@@ -96,6 +103,7 @@ export type DownloadAccessState =
   | 'no_file'
   | 'unpublished'
   | 'price_undefined'
+  | 'sale_closed'
   | 'purchase_required'
   | 'payment_pending'
   | 'payment_failed'

@@ -22,7 +22,7 @@ export type { PaymentPeriod, ProductQuote };
 
 function downloadAsPricedItem(productId: string): PricedItem | null {
   const pkg = getDownloadPackageSync(productId);
-  if (!pkg || pkg.priceUsd == null || pkg.priceUsd <= 0) return null;
+  if (!pkg || pkg.saleOpen === false || pkg.priceUsd == null || pkg.priceUsd <= 0) return null;
   return {
     id: pkg.productId,
     name: pkg.name,
@@ -66,6 +66,10 @@ export function quoteProduct(input: {
   period: PaymentPeriod;
   quantity?: number;
 }): ProductQuote | { error: string } {
+  const stored = getDownloadPackageSync(input.productId);
+  if (stored && stored.saleOpen === false && stored.priceUsd != null && stored.priceUsd > 0) {
+    return { error: 'Bu yazılım paketi satışa kapalı.' };
+  }
   const download = downloadAsPricedItem(input.productId);
   if (!download || download.priceUsd == null) {
     return quotePricingProduct(input);

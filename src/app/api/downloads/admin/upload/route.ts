@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readAdminSession } from '@/lib/downloads/auth';
+import { parseSaleStatusField } from '@/lib/downloads/sale';
 import { toPublicPackage } from '@/lib/downloads/store';
 import { persistAdminUpload } from '@/lib/downloads/upload';
 import { clientIp, paymentLog, rateLimit } from '@/lib/payments/security';
@@ -42,6 +43,15 @@ export async function POST(request: Request) {
 
   const publishedRaw = String(form.get('published') ?? 'true').trim().toLowerCase();
   const published = publishedRaw !== 'false' && publishedRaw !== '0';
+  const saleField = form.get('saleStatus');
+  let saleOpen: boolean | undefined;
+  if (saleField != null) {
+    const parsed = parseSaleStatusField(String(saleField));
+    if (parsed === 'invalid') {
+      return NextResponse.json({ error: 'Geçerli bir satış durumu seçin.' }, { status: 400 });
+    }
+    saleOpen = parsed;
+  }
 
   const result = await persistAdminUpload({
     adminEmail: 'download-admin',
@@ -56,6 +66,7 @@ export async function POST(request: Request) {
     priceUsd,
     currency: String(form.get('currency') ?? 'USD'),
     published,
+    saleOpen,
     replaceProductId: String(form.get('replaceProductId') ?? '').trim() || null,
     file,
   });

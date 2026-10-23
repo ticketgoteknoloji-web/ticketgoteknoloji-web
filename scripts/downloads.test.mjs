@@ -24,6 +24,8 @@ const accessRoute = readFileSync(join(root, 'src/app/api/downloads/[productId]/a
 const envExample = readFileSync(join(root, '.env.example'), 'utf8');
 const gitignore = readFileSync(join(root, '.gitignore'), 'utf8');
 const hashScript = readFileSync(join(root, 'scripts/hash-download-admin-code.mjs'), 'utf8');
+const saleRoute = readFileSync(join(root, 'src/app/api/downloads/admin/sale/route.ts'), 'utf8');
+const commerceServer = readFileSync(join(root, 'src/lib/commerce-server.ts'), 'utf8');
 
 const FORBIDDEN = [
   /feribot/i,
@@ -72,7 +74,7 @@ test('admin authentication uses code hash, not email/password', () => {
   assert.doesNotMatch(authSrc, /authenticateAdminCredentials/);
   assert.match(authSrc, /authenticateAdminCode/);
   assert.match(authSrc, /role:\s*DOWNLOAD_ADMIN_ROLE|role: typeof DOWNLOAD_ADMIN_ROLE/);
-  assert.match(loginRoute, /authenticateAdminCode/);
+  assert.match(loginRoute, /inspectAdminCode/);
   assert.match(loginRoute, /body\.code|code:/);
   assert.doesNotMatch(loginRoute, /body\.email/);
   assert.doesNotMatch(loginRoute, /body\.password/);
@@ -97,6 +99,63 @@ test('admin code scrypt verify accepts correct and rejects wrong codes', () => {
   assert.equal(verifyCode('', stored), false);
   assert.equal(verifyCode('correct-admin-code-for-test', ''), false);
   assert.equal(verifyCode('correct-admin-code-for-test', 'not-a-hash'), false);
+});
+
+test('generated scrypt hash matches the runtime format check', async () => {
+  const { isValidAdminCodeHash, verifyDownloadAdminCode, expectedAdminCodeHash } = await import(
+    '../src/lib/downloads/config.ts'
+  );
+  const code = 'correct-admin-code-for-test';
+  const stored = hashCode(code);
+  const [prefix, salt, digest] = stored.split('$');
+  assert.equal(prefix, 'scrypt');
+  assert.equal(salt.length, 32);
+  assert.equal(digest.length, 128);
+  assert.equal(isValidAdminCodeHash(stored), true);
+  assert.equal(verifyDownloadAdminCode(code, stored), true);
+  assert.equal(verifyDownloadAdminCode('wrong-code', stored), false);
+  assert.equal(verifyDownloadAdminCode('', stored), false);
+  assert.equal(isValidAdminCodeHash('scrypt'), false);
+  assert.equal(isValidAdminCodeHash(''), false);
+  assert.equal(isValidAdminCodeHash('not-a-hash'), false);
+  assert.equal(isValidAdminCodeHash(`${prefix}$${salt.slice(0, 30)}$${digest}`), false);
+  assert.equal(isValidAdminCodeHash(`${prefix}$${salt}$${digest.slice(0, 126)}`), false);
+  assert.doesNotMatch(configSrc, /readFileSync/);
+  assert.doesNotMatch(configSrc, /resolveAdminCodeHash/);
+  assert.match(configSrc, /process\.env\.DOWNLOAD_ADMIN_CODE_HASH/);
+
+  const previous = process.env.DOWNLOAD_ADMIN_CODE_HASH;
+  try {
+    process.env.DOWNLOAD_ADMIN_CODE_HASH = ` ${stored} `;
+    assert.equal(expectedAdminCodeHash(), stored);
+    process.env.DOWNLOAD_ADMIN_CODE_HASH = 'scrypt';
+    assert.equal(expectedAdminCodeHash(), 'scrypt');
+    delete process.env.DOWNLOAD_ADMIN_CODE_HASH;
+    assert.equal(expectedAdminCodeHash(), '');
+  } finally {
+    if (previous === undefined) delete process.env.DOWNLOAD_ADMIN_CODE_HASH;
+    else process.env.DOWNLOAD_ADMIN_CODE_HASH = previous;
+  }
+});
+
+test('admin login diagnostics do not record secrets', () => {
+  assert.match(loginRoute, /stage: 'body_unreadable'/);
+  assert.match(loginRoute, /inspectAdminCode/);
+  assert.match(loginRoute, /adminLoginAllowed/);
+  assert.match(loginRoute, /status: 429/);
+  assert.match(loginRoute, /stage !== 'verify_ok'/);
+  assert.match(loginRoute, /encodeAdminSession/);
+  const gate = loginRoute.indexOf("stage !== 'verify_ok'");
+  const cookie = loginRoute.indexOf('response.cookies.set');
+  assert.ok(gate !== -1 && cookie > gate);
+  assert.doesNotMatch(loginRoute, /paymentLog\([^)]*\bcode\b/);
+  assert.doesNotMatch(loginRoute, /paymentLog\([^)]*HASH/);
+  assert.doesNotMatch(loginRoute, /paymentLog\([^)]*\bbody\b/);
+  assert.match(authSrc, /code_missing_or_too_long/);
+  assert.match(authSrc, /hash_missing/);
+  assert.match(authSrc, /hash_format_invalid/);
+  assert.match(authSrc, /verify_failed/);
+  assert.match(authSrc, /verify_ok/);
 });
 
 test('plaintext admin code is not embedded in source', () => {
@@ -260,6 +319,49 @@ test('isolated free package metadata fixture validates expected shape', () => {
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
+});
+
+test('sale status defaults closed, blocks new purchases, and keeps downloads', async () => {
+  const { legacySaleOpen, saleOpenForSave, parseSaleStatusField, canPurchaseDownload } = await import(
+    '../src/lib/downloads/sale.ts'
+  );
+  assert.equal(saleOpenForSave(undefined, undefined), false);
+  assert.equal(saleOpenForSave(true, false), true);
+  assert.equal(saleOpenForSave(false, true), false);
+  assert.equal(saleOpenForSave(undefined, true), true);
+  assert.equal(legacySaleOpen(undefined), true);
+  assert.equal(legacySaleOpen(false), false);
+  assert.equal(parseSaleStatusField(undefined), false);
+  assert.equal(parseSaleStatusField(''), false);
+  assert.equal(parseSaleStatusField('closed'), false);
+  assert.equal(parseSaleStatusField('open'), true);
+  assert.equal(parseSaleStatusField('maybe'), 'invalid');
+  assert.equal(canPurchaseDownload({ priceUsd: 25, saleOpen: true, published: true }), true);
+  assert.equal(canPurchaseDownload({ priceUsd: 25, saleOpen: false, published: true }), false);
+  assert.equal(canPurchaseDownload({ priceUsd: 0, saleOpen: false, published: true }), false);
+  assert.equal(canPurchaseDownload({ priceUsd: null, saleOpen: true, published: true }), false);
+
+  assert.match(uploadModal, /Satış Durumu/);
+  assert.match(uploadModal, /name="saleStatus"/);
+  assert.match(uploadModal, /value="closed"/);
+  assert.match(uploadModal, /defaultChecked/);
+  assert.match(uploadModal, /Satışa Açık/);
+  assert.match(uploadRoute, /parseSaleStatusField/);
+  assert.match(saleRoute, /readAdminSession/);
+  assert.match(saleRoute, /status: 401/);
+  assert.match(saleRoute, /typeof body\.saleOpen !== 'boolean'/);
+  assert.match(saleRoute, /updatePackageSaleOpen/);
+  assert.match(storeSrc, /current\.saleOpen === saleOpen/);
+  assert.match(commerceServer, /Bu yazılım paketi satışa kapalı/);
+  assert.match(commerceServer, /saleOpen === false/);
+  assert.match(accessRoute, /sale_closed/);
+  assert.match(accessRoute, /priceUsd === 0/);
+  assert.doesNotMatch(fileRoute, /saleOpen/);
+  assert.match(table, /Satış Durumu/);
+  assert.match(table, /\/api\/downloads\/admin\/sale/);
+  const gate = table.indexOf('if (!res.ok || !json.package');
+  const apply = table.indexOf('setPackages((current)');
+  assert.ok(gate !== -1 && apply > gate);
 });
 
 test('platform filter helpers support multi-platform packages', () => {

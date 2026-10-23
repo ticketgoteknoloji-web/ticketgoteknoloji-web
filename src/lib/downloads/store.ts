@@ -9,6 +9,7 @@ import {
   type DownloadPlatformId,
 } from '@/data/downloads';
 import { downloadsDataPath } from '@/lib/downloads/config';
+import { legacySaleOpen } from '@/lib/downloads/sale';
 import { resolveStoredFileAbsolute, storedFileExists } from '@/lib/downloads/storage';
 import type {
   DownloadEntitlement,
@@ -48,6 +49,7 @@ function normalizePackage(raw: StoredDownloadPackage): StoredDownloadPackage {
     mimeType: raw.mimeType ?? 'application/octet-stream',
     published: raw.published ?? raw.status === 'published',
     status: raw.published === false ? 'unpublished' : raw.status ?? 'published',
+    saleOpen: legacySaleOpen(raw.saleOpen),
   };
 }
 
@@ -170,7 +172,8 @@ export function toPublicPackage(
     currency: pkg.currency || 'USD',
     checksumSha256: pkg.checksumSha256,
     fileAvailable,
-    purchasable: fileAvailable && price != null && price > 0,
+    saleOpen: pkg.saleOpen,
+    purchasable: fileAvailable && pkg.saleOpen === true && price != null && price > 0,
     free: fileAvailable && price === 0,
   };
 }
@@ -207,6 +210,34 @@ export async function saveUploadedPackage(
     if (db.audit.length > 500) db.audit = db.audit.slice(-500);
     await writeDb(db);
     return pkg;
+  });
+}
+
+/** Idempotent. Serialized with other store writes. Does not touch entitlements. */
+export async function updatePackageSaleOpen(
+  productId: string,
+  saleOpen: boolean
+): Promise<StoredDownloadPackage | null> {
+  const id = productId.trim();
+  if (!id || id.includes('..') || id.includes('/') || id.includes('\\')) return null;
+  return enqueue(async () => {
+    const db = await readDb();
+    const index = db.packages.findIndex((item) => item.productId === id || item.id === id);
+    if (index < 0) return null;
+    const current = db.packages[index];
+    if (current.saleOpen === saleOpen) return current;
+    const next: StoredDownloadPackage = { ...current, saleOpen };
+    db.packages[index] = next;
+    db.audit.push({
+      id: `AUD-${randomBytes(6).toString('hex')}`,
+      event: saleOpen ? 'sale_opened' : 'sale_closed',
+      productId: current.productId,
+      admin: 'download-admin',
+      createdAt: new Date().toISOString(),
+    });
+    if (db.audit.length > 500) db.audit = db.audit.slice(-500);
+    await writeDb(db);
+    return next;
   });
 }
 

@@ -8,6 +8,7 @@ import {
   DOWNLOAD_ADMIN_COOKIE,
   downloadSessionSecretCandidates,
   expectedAdminCodeHash,
+  isValidAdminCodeHash,
   verifyDownloadAdminCode,
 } from '@/lib/downloads/config';
 
@@ -43,13 +44,28 @@ export type AdminSession = {
   exp: number;
 };
 
+export type AdminLoginStage =
+  | 'code_missing_or_too_long'
+  | 'hash_missing'
+  | 'hash_format_invalid'
+  | 'verify_failed'
+  | 'verify_ok';
+
+/** Fail-closed. The stage is safe to log; it never includes the code or hash. */
+export function inspectAdminCode(code: string): AdminLoginStage {
+  if (typeof code !== 'string' || !code || code.length > DOWNLOAD_ADMIN_CODE_MAX_LENGTH) {
+    return 'code_missing_or_too_long';
+  }
+  const expectedHash = expectedAdminCodeHash();
+  if (!expectedHash) return 'hash_missing';
+  if (!isValidAdminCodeHash(expectedHash)) return 'hash_format_invalid';
+  if (!verifyDownloadAdminCode(code, expectedHash)) return 'verify_failed';
+  return 'verify_ok';
+}
+
 /** Fail-closed when hash missing or code invalid. Never logs the code. */
 export function authenticateAdminCode(code: string): boolean {
-  if (typeof code !== 'string') return false;
-  if (!code || code.length > DOWNLOAD_ADMIN_CODE_MAX_LENGTH) return false;
-  const expectedHash = expectedAdminCodeHash();
-  if (!expectedHash) return false;
-  return verifyDownloadAdminCode(code, expectedHash);
+  return inspectAdminCode(code) === 'verify_ok';
 }
 
 export function adminLoginAllowed(ip: string): boolean {
