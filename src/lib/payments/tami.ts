@@ -5,9 +5,10 @@ import { tamiChargeMinor } from '@/lib/payments/charge';
 import { hasUsableTamiPosId, isTamiReady, tamiConfig } from '@/lib/payments/config';
 import { paymentLog } from '@/lib/payments/security';
 import {
-  generateJwkSignature,
+  createTamiSignedRequest,
   generatePgAuthToken,
   isTami3dsSuccess,
+  readTamiSignedResponse,
   tamiOrderId,
   verifyCallbackHash,
 } from '@/lib/payments/tami-crypto';
@@ -67,34 +68,71 @@ function describeTamiPayloadShape(payload: Record<string, unknown>) {
   };
 }
 
-function signedBody(body: Record<string, unknown>): Record<string, unknown> {
-  const cfg = tamiConfig();
-  const securityHash = generateJwkSignature(cfg.kid, cfg.k, body);
-  return { ...body, securityHash };
+const TAMI_AUTH_PATH = '/api/v0/payment/auth';
+const TAMI_COMPLETE_PATH = '/api/v0/payment/complete-3ds';
+const TAMI_QUERY_PATH = '/api/v0/payment/orderQuery';
+const TAMI_REFUND_PATH = '/api/v0/payment/refund';
+const TAMI_VOID_PATH = '/api/v0/payment/void';
+const COMPLETE_3DS_TIMEOUT_MS = 20_000;
+
+function tamiUrl(base: string, path: string): string {
+  const root = base.replace(/\/$/, '');
+  if (path.startsWith('/api/v0/') && root.endsWith('/api/v0')) return `${root}${path.slice('/api/v0'.length)}`;
+  return `${root}${path}`;
 }
 
-async function tamiPost(path: string, body: Record<string, unknown>): Promise<TamiJson> {
+function isTimeoutError(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('name' in error)) return false;
+  const name = String(error.name);
+  return name === 'TimeoutError' || name === 'AbortError';
+}
+
+function readBankBody(data: TamiJson, cfg: ReturnType<typeof tamiConfig>): TamiJson {
+  if (typeof data.signedResponse === 'string') {
+    const body = readTamiSignedResponse(data.signedResponse, cfg.k, cfg.merchantId, cfg.posId);
+    return body ?? { success: false, errorCode: 'response_unverified' };
+  }
+  if (data.success === false || asString(data.success).toLowerCase() === 'false') return data;
+  return { success: false, errorCode: 'response_unverified' };
+}
+
+async function tamiPost(path: string, body: Record<string, unknown>, timeoutMs?: number): Promise<TamiJson> {
   const cfg = tamiConfig();
   if (!isTamiReady() || !hasUsableTamiPosId(cfg.posId, cfg.merchantId)) {
     paymentLog('tami_http_blocked', { path, reason: 'missing_pos_id' });
     return { success: false, errorCode: 'missing_pos_id', errorMessage: 'Tami POS / Terminal ID henüz yapılandırılmadı.' };
   }
-  const payload = signedBody(body);
-  const correlationId = `Correlation${randomBytes(16).toString('hex')}`;
-  const response = await fetch(`${cfg.baseUrl}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'Accept-Language': 'tr',
-      // Kept at v3 until Tami SecurityHash Hesaplama v2 document confirms a different pair.
-      'PG-Api-Version': 'v3',
-      'PG-Auth-Token': generatePgAuthToken(cfg.merchantId, cfg.posId, cfg.secretKey),
-      correlationId,
-    },
-    body: JSON.stringify(payload),
-    cache: 'no-store',
+  const signedRequest = createTamiSignedRequest({
+    kid: cfg.kid,
+    k: cfg.k,
+    merchantNumber: cfg.merchantId,
+    terminalNumber: cfg.posId,
+    body,
   });
+  const correlationId = `Correlation${randomBytes(16).toString('hex')}`;
+  let response: Response;
+  try {
+    response = await fetch(tamiUrl(cfg.baseUrl, path), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'Accept-Language': 'tr',
+        'PG-Api-Version': 'v4',
+        'PG-Auth-Token': generatePgAuthToken(cfg.merchantId, cfg.posId, cfg.secretKey),
+        correlationId,
+      },
+      body: JSON.stringify({ signedRequest }),
+      cache: 'no-store',
+      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
+    });
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      paymentLog('tami_http_timeout', { path });
+      return { success: false, errorCode: 'timeout' };
+    }
+    throw error;
+  }
   const text = await response.text();
   let parsed: unknown = null;
   try {
@@ -102,7 +140,8 @@ async function tamiPost(path: string, body: Record<string, unknown>): Promise<Ta
   } catch {
     parsed = { success: false, errorMessage: 'tami_invalid_json' };
   }
-  const data = isRecord(parsed) ? parsed : { success: false, errorMessage: 'tami_invalid_response' };
+  const wire = isRecord(parsed) ? parsed : { success: false, errorMessage: 'tami_invalid_response' };
+  const data = readBankBody(wire, cfg);
   const responseCorrelationId = response.headers.get('correlationId') || asString(data.correlationId) || undefined;
   paymentLog('tami_http', {
     path,
@@ -114,7 +153,7 @@ async function tamiPost(path: string, body: Record<string, unknown>): Promise<Ta
     responseCorrelationId: responseCorrelationId && responseCorrelationId !== correlationId ? responseCorrelationId : undefined,
     paymentStatus: data.paymentStatus,
     orderStatus: data.orderStatus,
-    payloadShape: path === '/payment/auth' ? describeTamiPayloadShape(payload) : undefined,
+    payloadShape: path === TAMI_AUTH_PATH ? describeTamiPayloadShape(body) : undefined,
   });
   return data;
 }
@@ -193,17 +232,104 @@ function decodeThreeDsHtml(value: unknown): string | null {
   }
 }
 
-function mapQueryStatus(data: TamiJson): VerifyPaymentResult {
-  const paymentStatus = asString(data.paymentStatus).toUpperCase();
-  const success = data.success === true;
-  const bankRef = asString(data.bankReferenceNumber) || undefined;
-  if (success && (paymentStatus === 'SUCCESS' || paymentStatus === '')) {
-    return { ok: true, status: 'paid', providerPaymentId: bankRef, paymentTransactionId: bankRef };
+const CALLBACK_BOUND_FIELDS = ['orderId', 'txnAmount', 'currencyCode'] as const;
+
+function callbackCoversPayment(payload: Record<string, string>): boolean {
+  const fields = new Set(
+    (payload.hashParams || '')
+      .split('+')
+      .map((field) => field.trim())
+      .filter(Boolean)
+  );
+  return CALLBACK_BOUND_FIELDS.every((field) => fields.has(field));
+}
+
+function tryChargeMinor(order: CreatePaymentInput['order']): number | null {
+  if (order.chargedCurrency === 'TRY' && typeof order.chargedAmountMinor === 'number' && order.chargedAmountMinor > 0) {
+    return order.chargedAmountMinor;
   }
-  if (paymentStatus === 'NOT_COMPLETE') return { ok: true, status: 'processing' };
-  if (paymentStatus === 'TIME_OUT' || paymentStatus === 'FAIL') return { ok: true, status: 'failed' };
-  if (success) return { ok: true, status: 'processing' };
-  return { ok: true, status: 'failed' };
+  return null;
+}
+
+function callbackOrderMatches(order: CreatePaymentInput['order'], rawOrderId: string): boolean {
+  const received = rawOrderId.trim();
+  if (!received) return false;
+  return tamiOrderId(received) === tamiOrderId(order.orderNumber);
+}
+
+function completionAmount(value: unknown): string | number | undefined {
+  return typeof value === 'number' || typeof value === 'string' ? value : undefined;
+}
+
+function bankSuccess(value: unknown): boolean {
+  return value === true || (typeof value === 'string' && value.trim().toLowerCase() === 'true');
+}
+
+function bankFailure(value: unknown): boolean {
+  return value === false || (typeof value === 'string' && value.trim().toLowerCase() === 'false');
+}
+
+function completionMatches(data: TamiJson, order: CreatePaymentInput['order']): boolean {
+  const responseOrder = asString(data.orderId).trim();
+  const currency = asString(data.currency || data.currencyCode).trim().toUpperCase();
+  const chargeMinor = tryChargeMinor(order);
+  return (
+    Boolean(responseOrder) &&
+    tamiOrderId(responseOrder) === tamiOrderId(order.orderNumber) &&
+    chargeMinor != null &&
+    currency === 'TRY' &&
+    providerAmountMatches(completionAmount(data.amount), chargeMinor)
+  );
+}
+
+function paidResult(order: CreatePaymentInput['order'], bankRef: string | undefined): VerifyPaymentResult {
+  return {
+    ok: true,
+    status: 'paid',
+    providerPaymentId: bankRef,
+    paymentTransactionId: bankRef,
+    conversationId: tamiOrderId(order.orderNumber),
+  };
+}
+
+function assessOrderQuery(data: TamiJson, order: CreatePaymentInput['order']): VerifyPaymentResult {
+  if (asString(data.errorCode) === 'timeout' || asString(data.errorCode) === 'response_unverified') {
+    return { ok: true, status: 'processing' };
+  }
+  if (!bankSuccess(data.success) || !Array.isArray(data.content)) {
+    paymentLog('tami_query_unsettled', { orderNumber: order.orderNumber, errorCode: data.errorCode });
+    return { ok: true, status: 'processing' };
+  }
+  const row = data.content.find(
+    (item) => isRecord(item) && callbackOrderMatches(order, asString(item.orderId))
+  );
+  if (!isRecord(row)) return { ok: true, status: 'processing' };
+  const paymentStatus = asString(row.paymentStatus).toUpperCase();
+  const orderStatus = asString(row.orderStatus).toUpperCase();
+  const bankRef = asString(row.bankReferenceNumber) || undefined;
+  if (paymentStatus === 'SUCCESS' && orderStatus === 'AUTH' && completionMatches(row, order)) {
+    return paidResult(order, bankRef);
+  }
+  if (paymentStatus === 'FAIL' || paymentStatus === 'TIME_OUT') {
+    paymentLog('tami_query_not_paid', { orderNumber: order.orderNumber });
+    return { ok: true, status: 'failed' };
+  }
+  return { ok: true, status: 'processing' };
+}
+
+function assessComplete3ds(data: TamiJson, order: CreatePaymentInput['order']): VerifyPaymentResult {
+  if (asString(data.errorCode) === 'timeout' || asString(data.errorCode) === 'response_unverified') {
+    return { ok: true, status: 'processing' };
+  }
+  if (bankFailure(data.success)) {
+    paymentLog('tami_complete_failed', { orderNumber: order.orderNumber, errorCode: data.errorCode });
+    return { ok: true, status: 'failed' };
+  }
+  if (bankSuccess(data.success) && completionMatches(data, order)) {
+    return paidResult(order, asString(data.bankReferenceNumber) || undefined);
+  }
+  paymentLog('tami_complete_unsettled', { orderNumber: order.orderNumber, errorCode: data.errorCode });
+  return { ok: true, status: 'processing' };
 }
 
 export class TamiPaymentProvider implements PaymentProvider {
@@ -222,12 +348,12 @@ export class TamiPaymentProvider implements PaymentProvider {
       return { ok: false, code: 'provider_error', message: 'Kart bilgileri olmadan 3D Secure başlatılamaz.' };
     }
     try {
-      const data = await tamiPost('/payment/auth', buildAuthBody(input, input.card));
+      const data = await tamiPost(TAMI_AUTH_PATH, buildAuthBody(input, input.card));
       const html = decodeThreeDsHtml(data.threeDSHtmlContent);
-      if (data.success === true && html) {
+      if (bankSuccess(data.success) && html) {
         return { ok: true, redirectUrl: 'tami-launch', providerReference: tamiOrderId(input.order.orderNumber), threeDsHtml: html };
       }
-      if (data.success === true && !html) {
+      if (bankSuccess(data.success) && !html) {
         paymentLog('tami_auth_no_3ds', { orderNumber: input.order.orderNumber });
         return { ok: false, code: 'provider_error', message: '3D Secure sayfası alınamadı. Lütfen tekrar deneyin.' };
       }
@@ -245,59 +371,67 @@ export class TamiPaymentProvider implements PaymentProvider {
   async verifyPayment(input: VerifyPaymentInput): Promise<VerifyPaymentResult> {
     const cfg = tamiConfig();
     const payload = input.payload;
-    const orderId = payload.orderId || tamiOrderId(input.order.orderNumber);
-    if (orderId && tamiOrderId(input.order.orderNumber) !== tamiOrderId(orderId) && orderId !== input.order.orderNumber) {
-      paymentLog('tami_order_mismatch', { orderNumber: input.order.orderNumber });
+    const order = input.order;
+    if (!callbackOrderMatches(order, payload.orderId || '')) {
+      paymentLog('tami_order_mismatch', { orderNumber: order.orderNumber });
       return { ok: false, message: 'Sipariş numarası doğrulanamadı.' };
     }
-    if (payload.hashedData && !verifyCallbackHash(payload, cfg.secretKey)) {
-      paymentLog('tami_hash_invalid', { orderNumber: input.order.orderNumber });
+    if (
+      !payload.hashParams?.trim() ||
+      !payload.hashedData?.trim() ||
+      !callbackCoversPayment(payload) ||
+      !verifyCallbackHash(payload, cfg.secretKey)
+    ) {
+      paymentLog('tami_hash_invalid', { orderNumber: order.orderNumber });
       return { ok: false, message: '3D Secure imzası doğrulanamadı.' };
     }
-    const amountRaw = payload.txnAmount || payload.originalAmount || payload.amount;
-    const chargeMinor = input.order.chargedAmountMinor;
-    if (amountRaw) {
-      if (typeof chargeMinor !== 'number' || chargeMinor <= 0 || !providerAmountMatches(amountRaw, chargeMinor)) {
-        paymentLog('tami_amount_mismatch', { orderNumber: input.order.orderNumber });
-        return { ok: true, status: 'failed' };
-      }
+    const chargeMinor =
+      order.chargedCurrency === 'TRY' && typeof order.chargedAmountMinor === 'number' && order.chargedAmountMinor > 0
+        ? order.chargedAmountMinor
+        : null;
+    const currency = (payload.currencyCode || '').trim().toUpperCase();
+    if (chargeMinor == null || currency !== 'TRY' || !providerAmountMatches(payload.txnAmount, chargeMinor)) {
+      paymentLog('tami_amount_mismatch', { orderNumber: order.orderNumber });
+      return { ok: true, status: 'failed' };
     }
     if (!isTami3dsSuccess(payload)) {
-      paymentLog('tami_3ds_failed', { orderNumber: input.order.orderNumber, mdStatus: payload.mdStatus });
+      paymentLog('tami_3ds_failed', { orderNumber: order.orderNumber, mdStatus: payload.mdStatus });
       return { ok: true, status: 'failed' };
     }
 
     try {
-      const completed = await tamiPost('/payment/complete-3ds', { orderId: tamiOrderId(input.order.orderNumber) });
-      if (completed.success === true) {
-        const bankRef = asString(completed.bankReferenceNumber) || payload.bankReferenceNumber || undefined;
-        const paymentStatus = asString(completed.paymentStatus).toUpperCase();
-        if (paymentStatus && paymentStatus !== 'SUCCESS') {
-          return { ok: true, status: paymentStatus === 'NOT_COMPLETE' ? 'processing' : 'failed', providerPaymentId: bankRef };
+      const completed = await tamiPost(
+        TAMI_COMPLETE_PATH,
+        { orderId: tamiOrderId(order.orderNumber) },
+        COMPLETE_3DS_TIMEOUT_MS
+      );
+      if (asString(completed.errorCode) === 'timeout') {
+        paymentLog('tami_complete_timeout', { orderNumber: order.orderNumber });
+        const queried = await tamiPost(
+          TAMI_QUERY_PATH,
+          { orderId: tamiOrderId(order.orderNumber), isTransactionDetail: false },
+          COMPLETE_3DS_TIMEOUT_MS
+        );
+        if (asString(queried.errorCode) === 'timeout') {
+          paymentLog('tami_query_timeout', { orderNumber: order.orderNumber });
+          return { ok: true, status: 'processing' };
         }
-        return {
-          ok: true,
-          status: 'paid',
-          providerPaymentId: bankRef,
-          paymentTransactionId: bankRef,
-          conversationId: tamiOrderId(input.order.orderNumber),
-        };
+        return assessOrderQuery(queried, order);
       }
-      paymentLog('tami_complete_failed', { orderNumber: input.order.orderNumber, errorCode: completed.errorCode });
-      return { ok: true, status: 'failed' };
+      return assessComplete3ds(completed, order);
     } catch {
-      paymentLog('tami_complete_error', { orderNumber: input.order.orderNumber });
-      return { ok: false, message: '3D Secure tamamlama doğrulanamadı.' };
+      paymentLog('tami_complete_error', { orderNumber: order.orderNumber });
+      return { ok: true, status: 'processing' };
     }
   }
 
   async getPaymentStatus(order: CreatePaymentInput['order']): Promise<VerifyPaymentResult> {
     try {
-      const data = await tamiPost('/payment/query', {
+      const data = await tamiPost(TAMI_QUERY_PATH, {
         orderId: tamiOrderId(order.orderNumber),
-        isTransactionDetail: 'true',
+        isTransactionDetail: false,
       });
-      return mapQueryStatus(data);
+      return assessOrderQuery(data, order);
     } catch {
       return { ok: false, message: 'Tami durum sorgusu başarısız.' };
     }
@@ -305,12 +439,12 @@ export class TamiPaymentProvider implements PaymentProvider {
 
   async refundPayment(order: CreatePaymentInput['order']): Promise<{ ok: boolean; message: string }> {
     try {
-      const data = await tamiPost('/payment/reverse', {
+      const data = await tamiPost(TAMI_REFUND_PATH, {
         orderId: tamiOrderId(order.orderNumber),
         amount: Number(fromMinorUnits(tamiChargeMinor(order)).toFixed(2)),
         reason: 'merchant refund',
       });
-      if (data.success === true) return { ok: true, message: 'İade alındı.' };
+      if (bankSuccess(data.success)) return { ok: true, message: 'İade alındı.' };
       return { ok: false, message: asString(data.errorMessage) || 'İade başarısız.' };
     } catch {
       return { ok: false, message: 'Tami iade isteği gönderilemedi.' };
@@ -318,7 +452,16 @@ export class TamiPaymentProvider implements PaymentProvider {
   }
 
   async voidPayment(order: CreatePaymentInput['order']): Promise<{ ok: boolean; message: string }> {
-    return this.refundPayment(order);
+    try {
+      const data = await tamiPost(TAMI_VOID_PATH, {
+        orderId: tamiOrderId(order.orderNumber),
+        reason: 'merchant void',
+      });
+      if (bankSuccess(data.success)) return { ok: true, message: 'İptal alındı.' };
+      return { ok: false, message: asString(data.errorMessage) || 'İptal başarısız.' };
+    } catch {
+      return { ok: false, message: 'Tami iptal isteği gönderilemedi.' };
+    }
   }
 }
 

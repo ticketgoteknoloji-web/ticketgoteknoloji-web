@@ -206,7 +206,7 @@ test('Tami configured requires a real POS ID and blocks auth without it', () => 
   assert.match(health, /status: `Tami: \$\{health\.status\}`/);
   const createFn = tami.slice(tami.indexOf('async createPayment'), tami.indexOf('async verifyPayment'));
   const notConfiguredAt = createFn.indexOf("code: 'not_configured'");
-  const authCallAt = createFn.indexOf("tamiPost('/payment/auth'");
+  const authCallAt = createFn.indexOf('tamiPost(TAMI_AUTH_PATH');
   assert.equal(notConfiguredAt >= 0 && authCallAt > notConfiguredAt, true);
   const postFn = tami.slice(tami.indexOf('async function tamiPost'), tami.indexOf('function buildAuthBody'));
   const blockedAt = postFn.indexOf('tami_http_blocked');
@@ -264,9 +264,9 @@ test('Tami merchant and terminal stay distinct and POS uses the terminal number'
   assert.match(example, /TAMI_SECRET_KEY=/);
   assert.doesNotMatch(example, /77034202|84034204/);
   const refundFn = readFileSync(join(root, 'src/lib/payments/tami.ts'), 'utf8');
-  assert.match(refundFn, /tamiPost\('\/payment\/reverse'/);
+  assert.match(refundFn, /tamiPost\(TAMI_REFUND_PATH/);
   assert.match(refundFn, /tamiChargeMinor\(order\)/);
-  assert.match(refundFn, /return this\.refundPayment\(order\)/);
+  assert.match(refundFn, /tamiPost\(TAMI_VOID_PATH/);
   assert.doesNotMatch(refundFn, /partial|kısmi iade|refundAmount/i);
   const service = readFileSync(join(root, 'src/lib/payments/service.ts'), 'utf8');
   assert.match(service, /tamiCallbackInflight/);
@@ -432,9 +432,9 @@ test('Tami routes and provider exist; iyzico stays removed', () => {
   const pointsRoute = readFileSync(join(root, 'src/app/api/payments/tami/points/route.ts'), 'utf8');
   const checkout = readFileSync(join(root, 'src/components/payment/PaymentCheckout.tsx'), 'utf8');
   const config = readFileSync(join(root, 'src/config/payment.ts'), 'utf8');
-  assert.match(tami, /\/payment\/auth/);
-  assert.match(tami, /\/payment\/complete-3ds/);
-  assert.match(tami, /\/payment\/query/);
+  assert.match(tami, /\/api\/v0\/payment\/auth/);
+  assert.match(tami, /\/api\/v0\/payment\/complete-3ds/);
+  assert.match(tami, /\/api\/v0\/payment\/orderQuery/);
   assert.doesNotMatch(tami, /generateTamiPointQueryHash/);
   assert.match(crypto, /generatePgAuthToken/);
   assert.match(crypto, /generateTamiPointQueryHash/);
@@ -453,11 +453,11 @@ test('Tami routes and provider exist; iyzico stays removed', () => {
   assert.doesNotMatch(pointsRoute, /secretKey|pointHash|PG-Auth-Token/);
   assert.match(checkout, /Kullanılabilir Puan/);
   assert.match(checkout, /tamiPointPanel\.available/);
-  assert.match(tami, /'PG-Api-Version': 'v3'/);
+  assert.match(tami, /'PG-Api-Version': 'v4'/);
   assert.match(tami, /'PG-Auth-Token': generatePgAuthToken\(cfg\.merchantId, cfg\.posId, cfg\.secretKey\)/);
   assert.match(tami, /const correlationId = `Correlation\$\{randomBytes\(16\)\.toString\('hex'\)\}`/);
   assert.match(tami, /errorMessage: asString\(data\.errorMessage\)/);
-  assert.match(tami, /payloadShape: path === '\/payment\/auth' \? describeTamiPayloadShape\(payload\)/);
+  assert.match(tami, /payloadShape: path === TAMI_AUTH_PATH \? describeTamiPayloadShape\(body\)/);
   assert.doesNotMatch(tami, /console\.(log|info|debug).*PG-Auth-Token/);
   assert.doesNotMatch(crypto, /console\.(log|info|debug)/);
   assert.match(config, /TAMI_ENV/);
