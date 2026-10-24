@@ -392,7 +392,7 @@ export class TamiPaymentProvider implements PaymentProvider {
     const currency = (payload.currencyCode || '').trim().toUpperCase();
     if (chargeMinor == null || currency !== 'TRY' || !providerAmountMatches(payload.txnAmount, chargeMinor)) {
       paymentLog('tami_amount_mismatch', { orderNumber: order.orderNumber });
-      return { ok: true, status: 'failed' };
+      return { ok: false, message: 'Tutar veya para birimi doğrulanamadı.' };
     }
     if (!isTami3dsSuccess(payload)) {
       paymentLog('tami_3ds_failed', { orderNumber: order.orderNumber, mdStatus: payload.mdStatus });

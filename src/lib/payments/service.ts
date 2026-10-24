@@ -419,9 +419,18 @@ async function finalizeCallbackOnce(
   if (order.status === 'paid') return order;
   if (txn && order.processedTransactionIds?.includes(txn)) return order;
 
-  await updateOrder(order.id, { status: 'processing' });
   const provider = getPaymentProvider(providerId);
-  const verified = await provider.verifyPayment({ order, payload });
+  let verified;
+  if (providerId === 'tami') {
+    verified = await provider.verifyPayment({ order, payload });
+    if (!verified.ok) {
+      paymentLog('tami_callback_rejected', { orderNumber: order.orderNumber });
+      return order;
+    }
+  } else {
+    await updateOrder(order.id, { status: 'processing' });
+    verified = await provider.verifyPayment({ order, payload });
+  }
   if (providerId === 'tami') {
     const current = await getOrderById(order.id);
     if (current?.status === 'paid') return current;

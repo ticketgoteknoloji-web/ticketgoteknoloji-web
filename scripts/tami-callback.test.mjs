@@ -99,6 +99,31 @@ function entitlementCount() {
   return db.entitlements.filter((item) => item.status === 'active').length;
 }
 
+function readPayments() {
+  return JSON.parse(readFileSync(ordersFile, 'utf8'));
+}
+
+function attemptRecord(orderId) {
+  const now = '2026-10-24T09:00:00.000Z';
+  return {
+    id: `attempt-${orderId}`,
+    orderId,
+    provider: 'tami',
+    status: 'redirected',
+    amountMinor: 19900,
+    currency: 'TRY',
+    installment: 1,
+    cardProgram: null,
+    providerReference: null,
+    providerTransactionId: null,
+    responseCode: null,
+    mdStatus: null,
+    bankReference: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function orderRecord(id, orderNumber) {
   const now = '2026-10-24T09:00:00.000Z';
   return {
@@ -201,6 +226,7 @@ describe('Tami callback security', { concurrency: 1 }, () => {
   let createTamiSignedRequest;
   let finalizeFromCallback;
   let saveOrder;
+  let saveAttempt;
   let getOrderById;
   let completeCalls = 0;
   let queryCalls = 0;
@@ -212,7 +238,7 @@ describe('Tami callback security', { concurrency: 1 }, () => {
       '../src/lib/payments/tami-crypto.ts'
     ));
     ({ finalizeFromCallback } = await import('../src/lib/payments/service.ts'));
-    ({ saveOrder, getOrderById } = await import('../src/lib/payments/orders.ts'));
+    ({ saveOrder, saveAttempt, getOrderById } = await import('../src/lib/payments/orders.ts'));
     globalThis.fetch = async () => {
       throw new Error('bank_call_not_stubbed');
     };
@@ -340,7 +366,39 @@ describe('Tami callback security', { concurrency: 1 }, () => {
     delete payload.hashedData;
     delete payload.hashParams;
     const order = await settle('ord-unsigned', 'TGORDER1002', payload);
-    assert.notEqual(order?.status, 'paid');
+    assert.equal(order?.status, 'awaiting_payment');
+    assert.equal(readPayments().orders.find((item) => item.id === 'ord-unsigned')?.status, 'awaiting_payment');
+    assert.equal(readPayments().audit.filter((item) => item.orderId === 'ord-unsigned').length, 0);
+    assert.equal(completeCalls, 0);
+    assert.equal(entitlementCount(), before);
+  });
+
+  test('unverified callback leaves the stored order, attempt and audit unchanged', async () => {
+    const before = entitlementCount();
+    completeCalls = 0;
+    globalThis.fetch = async () => {
+      completeCalls += 1;
+      throw new Error('unverified_callback_reached_bank');
+    };
+    const order = orderRecord('ord-frozen', 'TGORDER1014');
+    const attempt = attemptRecord('ord-frozen');
+    await saveOrder(order);
+    await saveAttempt(attempt);
+    const payload = sign({ orderId: 'TGORDER1014' });
+    delete payload.hashedData;
+    delete payload.hashParams;
+    const result = await finalizeFromCallback('tami', payload);
+    const stored = readPayments();
+    const storedOrder = stored.orders.find((item) => item.id === 'ord-frozen');
+    const storedAttempt = stored.attempts.find((item) => item.id === attempt.id);
+    assert.equal(result?.status, 'awaiting_payment');
+    assert.equal(storedOrder?.status, 'awaiting_payment');
+    assert.equal(storedOrder?.updatedAt, order.updatedAt);
+    assert.equal(storedOrder?.paymentTransactionId, null);
+    assert.equal(storedAttempt?.status, 'redirected');
+    assert.equal(storedAttempt?.updatedAt, attempt.updatedAt);
+    assert.equal(storedAttempt?.responseCode, null);
+    assert.equal(stored.audit.filter((item) => item.orderId === 'ord-frozen').length, 0);
     assert.equal(completeCalls, 0);
     assert.equal(entitlementCount(), before);
   });
@@ -355,7 +413,8 @@ describe('Tami callback security', { concurrency: 1 }, () => {
     const payload = sign({ orderId: 'TGORDER1003' });
     payload.hashedData = 'invalid-signature';
     const order = await settle('ord-bad-hash', 'TGORDER1003', payload);
-    assert.notEqual(order?.status, 'paid');
+    assert.equal(order?.status, 'awaiting_payment');
+    assert.equal(readPayments().orders.find((item) => item.id === 'ord-bad-hash')?.status, 'awaiting_payment');
     assert.equal(completeCalls, 0);
     assert.equal(entitlementCount(), before);
   });
@@ -369,7 +428,8 @@ describe('Tami callback security', { concurrency: 1 }, () => {
     };
     const payload = sign({ orderId: 'OTHERORDER9', token: 'ord-wrong' });
     const order = await settle('ord-wrong', 'TGORDER1004', payload);
-    assert.notEqual(order?.status, 'paid');
+    assert.equal(order?.status, 'awaiting_payment');
+    assert.equal(readPayments().orders.find((item) => item.id === 'ord-wrong')?.status, 'awaiting_payment');
     assert.equal(completeCalls, 0);
     assert.equal(entitlementCount(), before);
   });
@@ -382,7 +442,8 @@ describe('Tami callback security', { concurrency: 1 }, () => {
       throw new Error('wrong_amount_reached_bank');
     };
     const order = await settle('ord-amount', 'TGORDER1005', sign({ orderId: 'TGORDER1005', txnAmount: '1.00' }));
-    assert.notEqual(order?.status, 'paid');
+    assert.equal(order?.status, 'awaiting_payment');
+    assert.equal(readPayments().orders.find((item) => item.id === 'ord-amount')?.status, 'awaiting_payment');
     assert.equal(completeCalls, 0);
     assert.equal(entitlementCount(), before);
   });
@@ -395,7 +456,8 @@ describe('Tami callback security', { concurrency: 1 }, () => {
       throw new Error('wrong_currency_reached_bank');
     };
     const order = await settle('ord-currency', 'TGORDER1006', sign({ orderId: 'TGORDER1006', currencyCode: 'USD' }));
-    assert.notEqual(order?.status, 'paid');
+    assert.equal(order?.status, 'awaiting_payment');
+    assert.equal(readPayments().orders.find((item) => item.id === 'ord-currency')?.status, 'awaiting_payment');
     assert.equal(completeCalls, 0);
     assert.equal(entitlementCount(), before);
   });
