@@ -1,7 +1,9 @@
+import path from 'path';
 import { quoteProduct, type PaymentPeriod } from '@/lib/commerce-server';
 import { grantDownloadEntitlement, revokeDownloadEntitlementsForOrder } from '@/lib/downloads/store';
 import { LEGAL_VERSIONS } from '@/lib/legal/versions';
 import { formatMinor } from '@/lib/money';
+import { DataFileError, withLockedUpdate } from '@/lib/persistence/locked-json';
 import { publicBaseUrl, qnbpayConfig, tamiConfig } from '@/lib/payments/config';
 import {
   appendAudit,
@@ -11,6 +13,7 @@ import {
   getOrderById,
   getOrderByIdempotency,
   getOrderByProviderToken,
+  paymentOrdersPath,
   saveAttempt,
   saveOrder,
   updateAttempt,
@@ -26,6 +29,11 @@ import type { OrderRecord, PaymentCard, PaymentCustomer, PaymentProviderId, Publ
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE = /^\+[1-9]\d{9,14}$/;
 const tamiCallbackInflight = new Map<string, Promise<OrderRecord | null>>();
+
+function tamiCallbackLockPath(orderId: string): string {
+  const safe = orderId.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || 'order';
+  return path.join(path.dirname(paymentOrdersPath()), `.tami-callback-${safe}.lock.json`);
+}
 
 export function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -365,13 +373,17 @@ export async function finalizeFromCallback(
   if (!peek) return null;
   const inflight = tamiCallbackInflight.get(peek.id);
   if (inflight) return inflight;
-  const run = finalizeCallbackOnce(providerId, payload);
+  const run = withLockedUpdate(tamiCallbackLockPath(peek.id), () => finalizeCallbackOnce(providerId, payload)).catch(
+    (error: unknown) => {
+      if (error instanceof DataFileError && error.code === 'lock_timeout') return getOrderById(peek.id);
+      throw error;
+    }
+  );
   tamiCallbackInflight.set(peek.id, run);
-  try {
-    return await run;
-  } finally {
-    tamiCallbackInflight.delete(peek.id);
-  }
+  void run.finally(() => {
+    if (tamiCallbackInflight.get(peek.id) === run) tamiCallbackInflight.delete(peek.id);
+  });
+  return run;
 }
 
 async function findCallbackOrder(payload: Record<string, string>): Promise<OrderRecord | null> {

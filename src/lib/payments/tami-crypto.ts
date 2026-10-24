@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from 'crypto';
+import { createCipheriv, createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 
 export function base64UrlEncode(input: Buffer | string): string {
   const buf = Buffer.isBuffer(input) ? input : Buffer.from(input, 'utf8');
@@ -66,18 +66,6 @@ export function parseKidAndK(password: string, username = ''): { kid: string; k:
   return { kid: username.trim() || trimmed, k: trimmed };
 }
 
-/** JWS compact HS512 over the request body JSON (without securityHash). */
-export function generateJwkSignature(kid: string, kValue: string, requestBody: Record<string, unknown>): string {
-  const bodyJson = JSON.stringify(requestBody);
-  const headerJson = JSON.stringify({ alg: 'HS512', typ: 'JWT', kid });
-  const headerB64 = base64UrlEncode(headerJson);
-  const payloadB64 = base64UrlEncode(bodyJson);
-  const signingInput = `${headerB64}.${payloadB64}`;
-  const key = base64UrlDecode(kValue);
-  const signature = createHmac('sha512', key).update(signingInput).digest();
-  return `${signingInput}.${base64UrlEncode(signature)}`;
-}
-
 function canonicalCallbackValue(field: string, value: unknown): string {
   if (field === 'success') {
     if (value === true || value === 1 || value === '1' || value === 'true') return 'true';
@@ -87,9 +75,8 @@ function canonicalCallbackValue(field: string, value: unknown): string {
 }
 
 export function computeCallbackHash(callback: Record<string, string>, secretKey: string): string {
-  const params =
-    callback.hashParams ||
-    'cardOrganization+cardBrand+cardType+maskedNumber+installmentCount+currencyCode+txnAmount+orderId+systemTime+success';
+  const params = callback.hashParams?.trim() ?? '';
+  if (!params || !secretKey) return '';
   let data = '';
   for (const field of params.split('+')) {
     const name = field.trim();
@@ -100,6 +87,7 @@ export function computeCallbackHash(callback: Record<string, string>, secretKey:
 }
 
 export function verifyCallbackHash(callback: Record<string, string>, secretKey: string): boolean {
+  if (!secretKey || !callback.hashParams?.trim() || !callback.hashedData?.trim()) return false;
   const expected = computeCallbackHash(callback, secretKey);
   const received = callback.hashedData ?? '';
   if (!expected || !received) return false;
@@ -107,6 +95,130 @@ export function verifyCallbackHash(callback: Record<string, string>, secretKey: 
   const b = Buffer.from(received);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
+}
+
+const TAMI_TOKEN_TTL_SECONDS = 600;
+const TAMI_CLOCK_SKEW_SECONDS = 60;
+
+function signHs512(kid: string, k: string, claims: Record<string, unknown>): string {
+  const headerJson = JSON.stringify(kid ? { alg: 'HS512', kid, typ: 'JWT' } : { alg: 'HS512', typ: 'JWT' });
+  const headerB64 = base64UrlEncode(headerJson);
+  const payloadB64 = base64UrlEncode(JSON.stringify(claims));
+  const signingInput = `${headerB64}.${payloadB64}`;
+  const signature = createHmac('sha512', base64UrlDecode(k)).update(signingInput).digest();
+  return `${signingInput}.${base64UrlEncode(signature)}`;
+}
+
+function encryptSignedJwt(k: string, jws: string): string {
+  const header = base64UrlEncode(JSON.stringify({ alg: 'dir', enc: 'A256GCM', cty: 'JWT' }));
+  const encryptionKey = createHash('sha256').update(base64UrlDecode(k)).digest();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', encryptionKey, iv);
+  cipher.setAAD(Buffer.from(header, 'ascii'));
+  const ciphertext = Buffer.concat([cipher.update(jws, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${header}..${base64UrlEncode(iv)}.${base64UrlEncode(ciphertext)}.${base64UrlEncode(tag)}`;
+}
+
+/**
+ * Tami v4 signedRequest.
+ * https://dev.tami.com.tr/istek-tokeni-olusturma
+ * HS512 JWS, then dir + A256GCM. Encryption key is SHA-256 of the decoded JWK k.
+ */
+export function createTamiSignedRequest(input: {
+  kid: string;
+  k: string;
+  merchantNumber: string;
+  terminalNumber: string;
+  body: Record<string, unknown>;
+}): string {
+  const now = Math.floor(Date.now() / 1000);
+  const claims = {
+    iss: `${input.merchantNumber}:${input.terminalNumber}`,
+    aud: 'tami',
+    jti: randomUUID(),
+    iat: now,
+    nbf: now,
+    exp: now + TAMI_TOKEN_TTL_SECONDS,
+    'tami:body': input.body,
+    'tami:apiVersion': 'v4',
+  };
+  return encryptSignedJwt(input.k, signHs512(input.kid, input.k, claims));
+}
+
+/** Test and local fixture helper. Production responses are created by Tami. */
+export function signTamiResponse(input: {
+  kid: string;
+  k: string;
+  merchantNumber: string;
+  terminalNumber: string;
+  body: Record<string, unknown>;
+}): string {
+  const now = Math.floor(Date.now() / 1000);
+  return signHs512(input.kid, input.k, {
+    iss: 'tami',
+    aud: `${input.merchantNumber}:${input.terminalNumber}`,
+    jti: randomUUID(),
+    iat: now,
+    nbf: now,
+    exp: now + TAMI_TOKEN_TTL_SECONDS,
+    'tami:body': input.body,
+    'tami:apiVersion': 'v4',
+  });
+}
+
+function jwtNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Tami v4 signedResponse.
+ * https://dev.tami.com.tr/cevap-tokeni-cozumleme
+ * Successful sandbox orderQuery responses are three-part HS512 JWTs.
+ * Five-part tokens are rejected. Operation pages describe the same field as
+ * encrypted, but their examples are truncated and the live success token is a JWT.
+ * Signature, audience, issuer and tami:apiVersion are required.
+ */
+export function readTamiSignedResponse(
+  token: string,
+  k: string,
+  merchantNumber: string,
+  terminalNumber: string
+): Record<string, unknown> | null {
+  const parts = token.split('.');
+  if (parts.length !== 3 || !k) return null;
+  const [headerB64, payloadB64, signatureB64] = parts;
+  let header: Record<string, unknown>;
+  let claims: Record<string, unknown>;
+  try {
+    header = JSON.parse(base64UrlDecode(headerB64).toString('utf8')) as Record<string, unknown>;
+    claims = JSON.parse(base64UrlDecode(payloadB64).toString('utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (header.alg !== 'HS512' || header.typ !== 'JWT') return null;
+  const expected = createHmac('sha512', base64UrlDecode(k)).update(`${headerB64}.${payloadB64}`).digest();
+  const received = base64UrlDecode(signatureB64);
+  if (expected.length !== received.length || !timingSafeEqual(expected, received)) return null;
+  if (claims.iss !== 'tami') return null;
+  if (claims.aud !== `${merchantNumber}:${terminalNumber}`) return null;
+  if (claims['tami:apiVersion'] !== 'v4') return null;
+  const now = Math.floor(Date.now() / 1000);
+  const exp = jwtNumber(claims.exp);
+  const nbf = jwtNumber(claims.nbf);
+  if (exp == null || now > exp + TAMI_CLOCK_SKEW_SECONDS) return null;
+  if (nbf != null && now + TAMI_CLOCK_SKEW_SECONDS < nbf) return null;
+  const body = claims['tami:body'];
+  if (body && typeof body === 'object' && !Array.isArray(body)) return body as Record<string, unknown>;
+  if (typeof body === 'string') {
+    try {
+      const parsed = JSON.parse(body) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 export function isTami3dsSuccess(payload: Record<string, string>): boolean {
